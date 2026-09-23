@@ -1,8 +1,8 @@
 ---
 title: Qwen-Image-2.1-LoRAs-PnP
 emoji: 🔥
-colorFrom: yellow
-colorTo: blue
+colorFrom: blue
+colorTo: gray
 sdk: gradio
 sdk_version: 6.28.0
 app_file: app.py
