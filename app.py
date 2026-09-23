@@ -1,3 +1,11 @@
+"""Qwen-Image-2.1 demo for Hugging Face ZeroGPU.
+Text-to-image, multi-reference image editing, and native RGBA generation with a
+single `QwenImage21Pipeline`. The pipeline is placed on `cuda` at import time,
+which is how ZeroGPU makes the weights resident: CUDA is emulated outside
+`@spaces.GPU` and the runtime moves the tensors onto the real GPU when a
+decorated function is called.
+"""
+
 import os
 import gc
 import random
@@ -30,6 +38,10 @@ OBJECT_REMOVER_REPO = "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-Preview"
 OBJECT_REMOVER_FILE = "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors"
 OBJECT_REMOVER_ADAPTER = "object_remover"
 
+NATURAL_EXPOSURE_REPO = "prithivMLmods/Qwen-Image-2.1-Natural-Exposure-LoRA"
+NATURAL_EXPOSURE_FILE = "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors"
+NATURAL_EXPOSURE_ADAPTER = "natural_exposure"
+
 MAX_SEED = np.iinfo(np.int32).max
 MAX_REF_IMAGES = 10
 
@@ -37,14 +49,16 @@ DEFAULT_MODE = "None (no LoRA)"
 TURBO_MODE = "4-Step Turbo (Viggle)"
 OBJECT_MOVER_MODE = "Object Mover (prithivMLmods)"
 OBJECT_REMOVER_MODE = "Object Remover (prithivMLmods)"
+NATURAL_EXPOSURE_MODE = "Natural Exposure (prithivMLmods)"
 CUSTOM_MODE = "Custom LoRA (enter repo below)"
 
-MODE_CHOICES = [DEFAULT_MODE, TURBO_MODE, OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, CUSTOM_MODE]
+MODE_CHOICES = [DEFAULT_MODE, TURBO_MODE, OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, CUSTOM_MODE]
 
 LORA_PRESETS = {
     TURBO_MODE: (TURBO_REPO, TURBO_LORA_FILE, TURBO_ADAPTER_NAME),
     OBJECT_MOVER_MODE: (OBJECT_MOVER_REPO, OBJECT_MOVER_FILE, OBJECT_MOVER_ADAPTER),
     OBJECT_REMOVER_MODE: (OBJECT_REMOVER_REPO, OBJECT_REMOVER_FILE, OBJECT_REMOVER_ADAPTER),
+    NATURAL_EXPOSURE_MODE: (NATURAL_EXPOSURE_REPO, NATURAL_EXPOSURE_FILE, NATURAL_EXPOSURE_ADAPTER),
 }
 
 TIERS = {
