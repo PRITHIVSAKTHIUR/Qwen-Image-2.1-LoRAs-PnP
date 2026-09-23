@@ -501,9 +501,9 @@ EXAMPLES = [
     ],
 ]
 
-with gr.Blocks(title="Qwen-Image-2.1") as demo:
+with gr.Blocks(title="Qwen-Image-2.1-LoRAs-PnP") as demo:
     gr.Markdown(
-        "# Qwen-Image-2.1\n"
+        "# Qwen-Image-2.1-LoRAs-PnP\n"
         "Unified text-to-image generation and image editing, running on ZeroGPU. "
         "Add reference images to switch to editing mode; leave them empty for text-to-image.\n\n"
         "[Model](https://huggingface.co/Qwen/Qwen-Image-2.1) | "
