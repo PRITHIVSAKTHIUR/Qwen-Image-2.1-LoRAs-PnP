@@ -351,6 +351,11 @@ body{
 .custom-lora-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,144,255,.15)}
 .custom-lora-input::placeholder{color:var(--faint)}
 
+.note-text {
+    font-size: 10px; color: var(--faint); margin-top: -4px; margin-bottom: 12px; 
+    font-family: 'Inter', sans-serif; line-height: 1.4;
+}
+
 /* ══ Status bar ══ */
 .statusbar{
     grid-area:statusbar;background:var(--panel);border-top:1px solid var(--border);
@@ -439,7 +444,7 @@ body{
     <span class="menubar-badge">DEMO</span>
     <div class="menubar-spacer"></div>
     <div class="menubar-status"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
-    <a href="https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP" target="_blank" rel="noopener" class="gh-btn">
+    <a href="https://github.com/QwenLM/Qwen-Image-2.1" target="_blank" rel="noopener" class="gh-btn">
       <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       <span>GitHub</span>
     </a>
@@ -581,6 +586,14 @@ body{
           <input type="range" id="custom-cfg" min="1.0" max="4.0" step="0.1" value="1.0">
           <span class="slider-val" id="custom-cfg-val">1.0</span>
         </div>
+        <div class="slider-row">
+          <label>GPU (s)</label>
+          <input type="range" id="custom-gpu-dur" min="30" max="180" step="30" value="90">
+          <span class="slider-val" id="custom-gpu-dur-val">90s</span>
+        </div>
+        <div class="note-text">
+            Note: If using 4-Step Turbo, adjust the slider to 30 secs.
+        </div>
         <div class="checkbox-row">
           <input type="checkbox" id="custom-transparent">
           <label for="custom-transparent">Transparent background (RGBA)</label>
@@ -644,6 +657,8 @@ const stepsSlider  = document.getElementById('custom-steps');
 const stepsVal     = document.getElementById('custom-steps-val');
 const cfgSlider    = document.getElementById('custom-cfg');
 const cfgVal       = document.getElementById('custom-cfg-val');
+const gpuDurSl     = document.getElementById('custom-gpu-dur');
+const gpuDurVal    = document.getElementById('custom-gpu-dur-val');
 const transparentChk = document.getElementById('custom-transparent');
 const randomizeChk = document.getElementById('custom-randomize');
 const infoTxt      = document.getElementById('custom-info');
@@ -813,14 +828,15 @@ btnUpload.addEventListener('click',  () => fileInput.click());
 btnClear.addEventListener('click',   clearAll);
 
 /* ── Sliders ── */
-function bindSlider(id) {
+function bindSlider(id, suffix='') {
     const slider  = document.getElementById(id);
     const valSpan = document.getElementById(id + '-val');
-    slider.addEventListener('input', () => { valSpan.textContent = slider.value; });
+    slider.addEventListener('input', () => { valSpan.textContent = slider.value + suffix; });
 }
 bindSlider('custom-seed');
 bindSlider('custom-steps');
 bindSlider('custom-cfg');
+bindSlider('custom-gpu-dur', 's');
 
 document.getElementById('dice-btn').addEventListener('click', () => {
     const s = Math.floor(Math.random() * 2147483647);
@@ -843,10 +859,18 @@ loraSelect.addEventListener('change', (e) => {
         cfgSlider.value = 1.0; cfgVal.textContent = '1.0';
         cfgSlider.disabled = true;
         negPromptInput.disabled = true;
+        
+        // Auto-set GPU duration to 30s for Turbo
+        gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
     } else {
         stepsSlider.disabled = false;
         cfgSlider.disabled = false;
         negPromptInput.disabled = false;
+        
+        // Revert GPU duration to 90s if it was lowered to 30 by turbo
+        if (parseInt(gpuDurSl.value) === 30) {
+            gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
+        }
     }
 });
 
@@ -940,6 +964,7 @@ async function runEdit() {
         mode: loraSelect.value,
         custom_lora_repo: customRepoInput.value,
         custom_lora_weight: customWeightInput.value,
+        gpu_duration: parseInt(gpuDurSl.value),
     };
 
     try {
