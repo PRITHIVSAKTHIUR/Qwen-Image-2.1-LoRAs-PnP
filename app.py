@@ -7,20 +7,20 @@ decorated function is called.
 """
 
 import os
+import gc
 import random
 import base64
 import json
-import tempfile
 from io import BytesIO
-from typing import Any
+from typing import List, Tuple
 
-import gradio as gr
-from gradio import Server
-from fastapi.responses import HTMLResponse
 import numpy as np
 import spaces
 import torch
 from PIL import Image
+import gradio as gr
+from gradio import Server
+from fastapi.responses import HTMLResponse
 from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
@@ -78,7 +78,9 @@ pipe = QwenImage21Pipeline.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16)
 print("Pipeline loaded.", flush=True)
 
 print(f"Loading turbo LoRA from {TURBO_REPO} ...", flush=True)
-pipe.load_lora_weights(TURBO_REPO, weight_name=TURBO_LORA_FILE, adapter_name=TURBO_ADAPTER_NAME, token=HF_TOKEN)
+pipe.load_lora_weights(
+    TURBO_REPO, weight_name=TURBO_LORA_FILE, adapter_name=TURBO_ADAPTER_NAME, token=HF_TOKEN,
+)
 pipe.disable_lora()
 print("Turbo LoRA loaded (inactive).", flush=True)
 
@@ -88,10 +90,12 @@ default_scheduler = pipe.scheduler
 turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config, shift_terminal=None)
 
 patch_embed = pipe.text_encoder.model.visual.patch_embed
+
 def _patch_embed_forward(hidden_states):
     proj = patch_embed.proj
     weight = proj.weight.reshape(proj.weight.shape[0], -1)
     return hidden_states.to(weight.dtype).flatten(1) @ weight.T + proj.bias
+
 patch_embed.forward = _patch_embed_forward
 
 def _custom_adapter_name(repo, weight_name):
@@ -103,16 +107,28 @@ def _ensure_lora_loaded(adapter_name, repo, weight_name):
         return
     print(f"Lazily loading LoRA '{adapter_name}' from {repo} ...", flush=True)
     try:
-        pipe.load_lora_weights(repo, weight_name=weight_name or None, adapter_name=adapter_name, token=HF_TOKEN)
+        pipe.load_lora_weights(
+            repo, weight_name=weight_name or None, adapter_name=adapter_name, token=HF_TOKEN,
+        )
     except Exception as exc:
         raise gr.Error(f"Could not load LoRA from '{repo}': {exc}") from exc
     _LOADED_ADAPTERS.add(adapter_name)
     print(f"LoRA '{adapter_name}' loaded.", flush=True)
 
-def _gpu_duration(prompt, refs_count, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora):
+def _needs_full_gpu(output_resolution, references):
+    return int(output_resolution) >= 2048 and bool(references)
+
+def _gpu_duration(
+    prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
+    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight,
+):
+    try:
+        refs = json.loads(images_b64_json) if images_b64_json else []
+    except:
+        refs = []
+    output_resolution = TIER_RESOLUTION.get(tier, 1024)
     steps = int(num_inference_steps)
-    needs_full = int(output_resolution) >= 2048 and refs_count > 0
-    if needs_full:
+    if _needs_full_gpu(output_resolution, refs):
         seconds = 25 + 1.6 * steps
     elif int(output_resolution) >= 2048:
         seconds = 18 + 2.4 * steps
@@ -124,7 +140,12 @@ _TEXT_ENCODER_EVICTION = {"armed": False}
 
 def _vram_note(stage):
     free, total = torch.cuda.mem_get_info()
-    print(f"[vram] {stage}: driver free={free / 2**30:.1f}G of {total / 2**30:.1f}G", flush=True)
+    print(
+        f"[vram] {stage}: driver free={free / 2**30:.1f}G of {total / 2**30:.1f}G, "
+        f"allocated={torch.cuda.memory_allocated() / 2**30:.1f}G, "
+        f"peak={torch.cuda.max_memory_allocated() / 2**30:.1f}G",
+        flush=True,
+    )
 
 def _release_text_encoder(module, args):
     if _TEXT_ENCODER_EVICTION["armed"]:
@@ -136,10 +157,10 @@ def _release_text_encoder(module, args):
 for component in (pipe.vae, pipe.transformer):
     component.register_forward_pre_hook(_release_text_encoder)
 
-def _needs_full_gpu(output_resolution, refs_count):
-    return int(output_resolution) >= 2048 and refs_count > 0
-
-def _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora):
+def _run_pipeline(
+    prompt, pil_references, width, height, output_resolution, num_inference_steps,
+    negative_prompt, guidance_scale, seed, turbo, lora
+):
     if lora:
         _ensure_lora_loaded(lora["adapter_name"], lora["repo"], lora.get("weight_name"))
         pipe.enable_lora()
@@ -153,6 +174,11 @@ def _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_
         pipe.text_encoder.to("cuda")
     _TEXT_ENCODER_EVICTION["armed"] = True
     torch.cuda.reset_peak_memory_stats()
+    lora_tag = lora["adapter_name"] if lora else "none"
+    _vram_note(
+        f"start {output_resolution}px, lora={lora_tag}, turbo={turbo}, "
+        f"text encoder was on {encoder_device}"
+    )
 
     generator = torch.Generator("cuda").manual_seed(int(seed))
     kwargs = {
@@ -164,8 +190,8 @@ def _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_
     if width:
         kwargs["width"] = int(width)
         kwargs["height"] = int(height)
-    if refs:
-        images = [img.convert("RGBA") for img in refs]
+    if pil_references:
+        images = [img.convert("RGBA") for img in pil_references]
         kwargs["image"] = images if len(images) > 1 else images[0]
     if negative_prompt and guidance_scale > 1:
         kwargs["negative_prompt"] = negative_prompt
@@ -173,44 +199,62 @@ def _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_
 
     try:
         image = pipe(**kwargs).images[0]
+        _vram_note("end of pipeline call")
         return image
     finally:
         _TEXT_ENCODER_EVICTION["armed"] = False
 
 @spaces.GPU(duration=_gpu_duration)
-def _generate(prompt, refs, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora):
-    return _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora)
+def _generate(
+    prompt, pil_references, width, height, output_resolution, num_inference_steps,
+    negative_prompt, guidance_scale, seed, turbo, lora
+):
+    return _run_pipeline(
+        prompt, pil_references, width, height, output_resolution, num_inference_steps,
+        negative_prompt, guidance_scale, seed, turbo, lora
+    )
 
 @spaces.GPU(duration=_gpu_duration, size="xlarge")
-def _generate_full_gpu(prompt, refs, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora):
-    return _run_pipeline(prompt, refs, width, height, output_resolution, num_inference_steps, negative_prompt, guidance_scale, seed, turbo, lora)
+def _generate_full_gpu(
+    prompt, pil_references, width, height, output_resolution, num_inference_steps,
+    negative_prompt, guidance_scale, seed, turbo, lora
+):
+    return _run_pipeline(
+        prompt, pil_references, width, height, output_resolution, num_inference_steps,
+        negative_prompt, guidance_scale, seed, turbo, lora
+    )
+
+def b64_to_pil_list(b64_json_str):
+    if not b64_json_str or b64_json_str.strip() in ("", "[]"):
+        return []
+    try:
+        b64_list = json.loads(b64_json_str)
+    except Exception:
+        return []
+    pil_images = []
+    for b64_str in b64_list:
+        if not b64_str or not isinstance(b64_str, str):
+            continue
+        try:
+            if b64_str.startswith("data:image"):
+                _, data = b64_str.split(",", 1)
+            else:
+                data = b64_str
+            image_data = base64.b64decode(data)
+            pil_images.append(Image.open(BytesIO(image_data)).convert("RGBA"))
+        except Exception as e:
+            print(f"Error decoding image: {e}")
+    return pil_images
 
 def pil_to_b64_png(image: Image.Image) -> str:
     buf = BytesIO()
     image.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
-# ── Gradio Server (Server mode): FastAPI + Gradio queue/API engine ────────────
-app = Server(title="Qwen-Image-2.1-LoRAs-PnP")
-
-@app.mcp.tool(name="generate")
-@app.api(name="generate")
-def infer(
-    prompt: str,
-    negative_prompt: str,
-    images_b64_json: str,
-    tier: str,
-    aspect_ratio: str,
-    num_inference_steps: int,
-    guidance_scale: float,
-    transparent: bool,
-    seed: int,
-    randomize_seed: bool,
-    mode: str,
-    custom_lora_repo: str,
-    custom_lora_weight: str,
-) -> dict:
-    """Runs Qwen-Image-2.1 generation or edit."""
+def generate(
+    prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
+    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight
+):
     prompt = (prompt or "").strip()
     if not prompt:
         raise gr.Error("Enter a prompt.")
@@ -230,20 +274,14 @@ def infer(
         if not repo:
             raise gr.Error("Enter a custom LoRA repo id.")
         weight_name = (custom_lora_weight or "").strip() or None
-        lora_config = {"repo": repo, "weight_name": weight_name, "adapter_name": _custom_adapter_name(repo, weight_name)}
+        lora_config = {
+            "repo": repo, "weight_name": weight_name,
+            "adapter_name": _custom_adapter_name(repo, weight_name),
+        }
 
-    refs = []
-    if images_b64_json and images_b64_json.strip() not in ("", "[]"):
-        try:
-            b64_list = json.loads(images_b64_json)
-            for b64_str in b64_list[:MAX_REF_IMAGES]:
-                if "," in b64_str:
-                    _, data = b64_str.split(",", 1)
-                else:
-                    data = b64_str
-                refs.append(Image.open(BytesIO(base64.b64decode(data))).convert("RGB"))
-        except Exception as e:
-            print(f"Error decoding reference images: {e}")
+    pil_refs = b64_to_pil_list(images_b64_json)[:MAX_REF_IMAGES]
+    if len(pil_refs) > MAX_REF_IMAGES:
+        gr.Warning(f"Using the first {MAX_REF_IMAGES} reference images.")
 
     if transparent:
         if RGBA_PREFIX.strip() not in prompt:
@@ -254,22 +292,22 @@ def infer(
     width, height = None, None
     if aspect_ratio in TIERS.get(tier, {}):
         width, height = TIERS[tier][aspect_ratio]
-    elif not refs:
+    elif not pil_refs:
         width, height = TIERS[tier]["1:1"]
-    
-    output_resolution = TIER_RESOLUTION.get(tier, 1024)
+    output_resolution = TIER_RESOLUTION[tier]
 
+    seed = int(seed) if seed is not None else 0
     if randomize_seed or seed < 0:
         seed = random.randint(0, MAX_SEED)
     seed = seed % (MAX_SEED + 1)
 
-    runner = _generate_full_gpu if _needs_full_gpu(output_resolution, len(refs)) else _generate
+    runner = _generate_full_gpu if _needs_full_gpu(output_resolution, pil_refs) else _generate
     image = runner(
-        prompt, refs, width, height, output_resolution, int(num_inference_steps),
+        prompt, pil_refs, width, height, output_resolution, int(num_inference_steps),
         (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config
     )
 
-    run_mode = "edit" if refs else "text-to-image"
+    run_mode = "edit" if pil_refs else "text-to-image"
     size = f"{width}x{height}" if width else f"{image.width}x{image.height} (from reference)"
     gpu = "full GPU" if runner is _generate_full_gpu else "half GPU"
     has_alpha = "RGBA" if image.mode == "RGBA" else "RGB"
@@ -278,22 +316,45 @@ def infer(
         f"{run_mode} | {size} | {int(num_inference_steps)} steps | seed {seed} | "
         f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | mode: {mode} | lora: {lora_tag}\n{prompt}"
     )
+    return image, info, seed
 
-    return {"image": pil_to_b64_png(image), "info": info, "seed": seed}
+app = Server(title="Qwen-Image-2.1-LoRAs-PnP")
+
+@app.mcp.tool(name="generate_image")
+@app.api(name="generate_image")
+def infer(
+    prompt: str,
+    negative_prompt: str,
+    images_b64_json: str,
+    tier: str,
+    aspect_ratio: str,
+    num_inference_steps: int,
+    guidance_scale: float,
+    transparent: bool,
+    seed: int,
+    randomize_seed: bool,
+    mode: str,
+    custom_lora_repo: str,
+    custom_lora_weight: str,
+) -> dict:
+    """Generates an image using Qwen-Image-2.1 with PnP LoRAs."""
+    gc.collect()
+    torch.cuda.empty_cache()
+
+    image, info, used_seed = generate(
+        prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
+        guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight
+    )
+    
+    return {
+        "image": pil_to_b64_png(image),
+        "info": info,
+        "seed": used_seed
+    }
 
 @app.get("/api/config")
 def client_config():
-    return {
-        "modes": MODE_CHOICES,
-        "tiers": list(TIERS.keys()),
-        "aspects": ASPECTS,
-        "examples": [
-            'A neon shop sign that reads "QWEN IMAGE 2.1", rainy night, reflections on wet pavement',
-            "A cute cartoon dragon sticker, thick outlines, flat pastel colors",
-            "Change the background to a sunset beach, keep the subject unchanged",
-            "These three characters are sitting around a campfire in a forest, cinematic lighting, shallow depth of field"
-        ]
-    }
+    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP"}
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
