@@ -1,6 +1,6 @@
 ---
-title: Qwen Image 2.1 LoRAs
-emoji: 🌍
+title: Qwen-Image-2.1-LoRAs-PnP
+emoji: 🔥
 colorFrom: yellow
 colorTo: blue
 sdk: gradio
