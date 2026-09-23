@@ -1,11 +1,3 @@
-"""Qwen-Image-2.1 demo for Hugging Face ZeroGPU.
-Text-to-image, multi-reference image editing, and native RGBA generation with a
-single `QwenImage21Pipeline`. The pipeline is placed on `cuda` at import time,
-which is how ZeroGPU makes the weights resident: CUDA is emulated outside
-`@spaces.GPU` and the runtime moves the tensors onto the real GPU when a
-decorated function is called.
-"""
-
 import os
 import gc
 import random
@@ -40,8 +32,6 @@ OBJECT_REMOVER_ADAPTER = "object_remover"
 
 MAX_SEED = np.iinfo(np.int32).max
 MAX_REF_IMAGES = 10
-MAX_GPU_SECONDS = 120
-MIN_GPU_SECONDS = 30
 
 DEFAULT_MODE = "None (no LoRA)"
 TURBO_MODE = "4-Step Turbo (Viggle)"
@@ -118,24 +108,6 @@ def _ensure_lora_loaded(adapter_name, repo, weight_name):
 def _needs_full_gpu(output_resolution, references):
     return int(output_resolution) >= 2048 and bool(references)
 
-def _gpu_duration(
-    prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
-    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight,
-):
-    try:
-        refs = json.loads(images_b64_json) if images_b64_json else []
-    except:
-        refs = []
-    output_resolution = TIER_RESOLUTION.get(tier, 1024)
-    steps = int(num_inference_steps)
-    if _needs_full_gpu(output_resolution, refs):
-        seconds = 25 + 1.6 * steps
-    elif int(output_resolution) >= 2048:
-        seconds = 18 + 2.4 * steps
-    else:
-        seconds = 15 + 1.2 * steps
-    return int(min(MAX_GPU_SECONDS, max(MIN_GPU_SECONDS, seconds)))
-
 _TEXT_ENCODER_EVICTION = {"armed": False}
 
 def _vram_note(stage):
@@ -204,20 +176,26 @@ def _run_pipeline(
     finally:
         _TEXT_ENCODER_EVICTION["armed"] = False
 
-@spaces.GPU(duration=_gpu_duration)
+def _gpu_duration_func(
+    prompt, pil_references, width, height, output_resolution, num_inference_steps,
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
+):
+    return int(gpu_duration)
+
+@spaces.GPU(duration=_gpu_duration_func)
 def _generate(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
         negative_prompt, guidance_scale, seed, turbo, lora
     )
 
-@spaces.GPU(duration=_gpu_duration, size="xlarge")
+@spaces.GPU(duration=_gpu_duration_func, size="xlarge")
 def _generate_full_gpu(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
@@ -253,7 +231,7 @@ def pil_to_b64_png(image: Image.Image) -> str:
 
 def generate(
     prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
-    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight
+    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
 ):
     prompt = (prompt or "").strip()
     if not prompt:
@@ -304,7 +282,7 @@ def generate(
     runner = _generate_full_gpu if _needs_full_gpu(output_resolution, pil_refs) else _generate
     image = runner(
         prompt, pil_refs, width, height, output_resolution, int(num_inference_steps),
-        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config
+        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config, int(gpu_duration)
     )
 
     run_mode = "edit" if pil_refs else "text-to-image"
@@ -314,7 +292,8 @@ def generate(
     lora_tag = lora_config["adapter_name"] if lora_config else "none"
     info = (
         f"{run_mode} | {size} | {int(num_inference_steps)} steps | seed {seed} | "
-        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | mode: {mode} | lora: {lora_tag}\n{prompt}"
+        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | mode: {mode} | lora: {lora_tag} | "
+        f"gpu_duration: {gpu_duration}s\n{prompt}"
     )
     return image, info, seed
 
@@ -336,6 +315,7 @@ def infer(
     mode: str,
     custom_lora_repo: str,
     custom_lora_weight: str,
+    gpu_duration: int,
 ) -> dict:
     """Generates an image using Qwen-Image-2.1 with PnP LoRAs."""
     gc.collect()
@@ -343,7 +323,7 @@ def infer(
 
     image, info, used_seed = generate(
         prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
-        guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight
+        guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
     )
     
     return {
