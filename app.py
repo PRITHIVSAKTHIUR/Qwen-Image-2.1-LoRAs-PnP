@@ -5,6 +5,13 @@ single `QwenImage21Pipeline`. The pipeline is placed on `cuda` at import time,
 which is how ZeroGPU makes the weights resident: CUDA is emulated outside
 `@spaces.GPU` and the runtime moves the tensors onto the real GPU when a
 decorated function is called.
+
+Generation mode: "Default" runs the base Qwen-Image-2.1 checkpoint at
+whatever step count the user picks. "4-Step Turbo" activates the
+Viggle/Qwen-Image-2.1-viggle-turbo LoRA (r64) on top of the same transformer
+and forces the distilled 4-step schedule with CFG off. The LoRA is loaded
+once at startup and left disabled; each request enables or disables it and
+swaps the scheduler to match, so only one mode is ever active on the GPU.
 """
 
 import os
@@ -15,14 +22,23 @@ import numpy as np
 import spaces
 import torch
 from PIL import Image
-from diffusers import QwenImage21Pipeline
+from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
+TURBO_REPO = os.environ.get("TURBO_REPO", "Viggle/Qwen-Image-2.1-viggle-turbo")
+TURBO_LORA_FILE = "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
+TURBO_ADAPTER_NAME = "turbo"
+TURBO_STEPS = 4
+HF_TOKEN = os.environ.get("HF_TOKEN")  # only needed if the turbo repo is private/gated
+
 MAX_SEED = np.iinfo(np.int32).max
 MAX_REF_IMAGES = 10
 # ZeroGPU rejects any request above 120s of GPU time.
 MAX_GPU_SECONDS = 120
 MIN_GPU_SECONDS = 30
+
+DEFAULT_MODE = "Default"
+TURBO_MODE = "4-Step Turbo (Viggle)"
 
 # Output sizes. Every value is a multiple of 32 because the pipeline packs
 # 2x2 latent patches on top of a 16x spatial compression factor.
@@ -58,6 +74,38 @@ print(f"Loading {MODEL_ID} ...", flush=True)
 pipe = QwenImage21Pipeline.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16).to("cuda")
 print("Pipeline loaded.", flush=True)
 
+print(f"Loading turbo LoRA from {TURBO_REPO} ...", flush=True)
+pipe.load_lora_weights(
+    TURBO_REPO,
+    weight_name=TURBO_LORA_FILE,
+    adapter_name=TURBO_ADAPTER_NAME,
+    token=HF_TOKEN,
+)
+pipe.disable_lora()  # inactive by default; _run_pipeline enables it per request when turbo mode is picked
+print("Turbo LoRA loaded (inactive).", flush=True)
+
+# The stock Qwen-Image-2.1 scheduler config carries shift_terminal=0.02, which stretches the
+# last sigma node to 0.02 instead of 0 and silently costs the final step. The turbo student was
+# distilled against the unstretched schedule, so keep a second scheduler for turbo mode and swap
+# between the two per request rather than mutating one shared config.
+default_scheduler = pipe.scheduler
+turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config, shift_terminal=None)
+
+# transformers' Qwen3VLVisionPatchEmbed runs an nn.Conv3d whose kernel_size equals its stride, which is
+# exactly a linear map over each flattened patch. cuDNN has no usable bf16 Conv3d kernel for this shape and
+# falls back to one that costs ~30 s per reference image (measured; 356 ms even with memory to spare, versus
+# 2.9 ms for the same conv in fp32). The matmul below is 0.8 ms and its output is bitwise equal to the conv's.
+patch_embed = pipe.text_encoder.model.visual.patch_embed
+
+
+def _patch_embed_forward(hidden_states):
+    proj = patch_embed.proj
+    weight = proj.weight.reshape(proj.weight.shape[0], -1)
+    return hidden_states.to(weight.dtype).flatten(1) @ weight.T + proj.bias
+
+
+patch_embed.forward = _patch_embed_forward
+
 
 def _gpu_duration(
     prompt,
@@ -69,11 +117,14 @@ def _gpu_duration(
     negative_prompt,
     guidance_scale,
     seed,
+    turbo,
 ):
     """Seconds to reserve, from the cost of the request.
 
     ZeroGPU charges quota for the reserved window rather than the wall clock
     used, so ask for close to the real cost and never exceed the 120s ceiling.
+    Turbo mode already arrives here with num_inference_steps forced to 4, so
+    the formula below needs no separate turbo branch.
     """
     steps = int(num_inference_steps)
     if _needs_full_gpu(output_resolution, references):
@@ -135,13 +186,26 @@ def _run_pipeline(
     negative_prompt,
     guidance_scale,
     seed,
+    turbo,
 ):
+    # Only one mode is ever active on the shared pipe object: turbo enables its LoRA
+    # adapter and the unstretched scheduler, default disables the adapter and restores
+    # the stock scheduler. This runs inside the ZeroGPU-decorated call, same as the
+    # text encoder move below, so the adapter toggle lands before the transformer forward.
+    if turbo:
+        pipe.enable_lora()
+        pipe.set_adapters([TURBO_ADAPTER_NAME], adapter_weights=[1.0])
+        pipe.scheduler = turbo_scheduler
+    else:
+        pipe.disable_lora()
+        pipe.scheduler = default_scheduler
+
     encoder_device = next(pipe.text_encoder.parameters()).device
     if encoder_device.type != "cuda":
         pipe.text_encoder.to("cuda")
     _TEXT_ENCODER_EVICTION["armed"] = True
     torch.cuda.reset_peak_memory_stats()
-    _vram_note(f"start {output_resolution}px, text encoder was on {encoder_device}")
+    _vram_note(f"start {output_resolution}px, {'turbo' if turbo else 'default'}, text encoder was on {encoder_device}")
 
     generator = torch.Generator("cuda").manual_seed(int(seed))
     kwargs = {
@@ -179,6 +243,7 @@ def _generate(
     negative_prompt,
     guidance_scale,
     seed,
+    turbo,
 ):
     return _run_pipeline(
         prompt,
@@ -190,6 +255,7 @@ def _generate(
         negative_prompt,
         guidance_scale,
         seed,
+        turbo,
     )
 
 
@@ -204,6 +270,7 @@ def _generate_full_gpu(
     negative_prompt,
     guidance_scale,
     seed,
+    turbo,
 ):
     return _run_pipeline(
         prompt,
@@ -215,6 +282,7 @@ def _generate_full_gpu(
         negative_prompt,
         guidance_scale,
         seed,
+        turbo,
     )
 
 
@@ -238,11 +306,20 @@ def generate(
     transparent,
     seed,
     randomize_seed,
+    mode,
     progress=gr.Progress(track_tqdm=True),
 ):
     prompt = (prompt or "").strip()
     if not prompt:
         raise gr.Error("Enter a prompt.")
+
+    turbo = mode == TURBO_MODE
+    if turbo:
+        # Steps and CFG are fixed by the distillation recipe; ignore whatever the
+        # (disabled) sliders currently hold so a stale value can't sneak through.
+        num_inference_steps = TURBO_STEPS
+        guidance_scale = 1.0
+        negative_prompt = ""
 
     refs = [_reference_path(item) for item in (references or [])]
     refs = [path for path in refs if path][:MAX_REF_IMAGES]
@@ -285,17 +362,33 @@ def generate(
         (negative_prompt or "").strip(),
         float(guidance_scale),
         seed,
+        turbo,
     )
 
-    mode = "edit" if refs else "text-to-image"
+    run_mode = "edit" if refs else "text-to-image"
     size = f"{width}x{height}" if width else f"{image.width}x{image.height} (from reference)"
     gpu = "full GPU" if runner is _generate_full_gpu else "half GPU"
     has_alpha = "RGBA" if image.mode == "RGBA" else "RGB"
     info = (
-        f"{mode} | {size} | {int(num_inference_steps)} steps | seed {seed} | "
-        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha}\n{prompt}"
+        f"{run_mode} | {size} | {int(num_inference_steps)} steps | seed {seed} | "
+        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | {mode}\n{prompt}"
     )
     return image, info
+
+
+def _on_mode_change(mode):
+    turbo = mode == TURBO_MODE
+    if turbo:
+        steps_update = gr.update(value=TURBO_STEPS, interactive=False, info="Fixed at 4 steps for the turbo student.")
+        guidance_update = gr.update(value=1.0, interactive=False, info="Turbo is distilled without CFG.")
+        negative_update = gr.update(interactive=False)
+    else:
+        steps_update = gr.update(value=40, interactive=True, info="40 is the official default.")
+        guidance_update = gr.update(
+            value=1.0, interactive=True, info="1.0 disables classifier-free guidance, as Qwen-Image-2.1 recommends."
+        )
+        negative_update = gr.update(interactive=True)
+    return steps_update, guidance_update, negative_update
 
 
 EXAMPLES = [
@@ -315,7 +408,8 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
         "Add reference images to switch to editing mode; leave them empty for text-to-image.\n\n"
         "[Model](https://huggingface.co/Qwen/Qwen-Image-2.1) | "
         "[Blog](https://qwen.ai/blog?id=qwen-image-2.1) | "
-        "[GitHub](https://github.com/QwenLM/Qwen-Image-2.1)"
+        "[GitHub](https://github.com/QwenLM/Qwen-Image-2.1) | "
+        "[Turbo LoRA](https://huggingface.co/Viggle/Qwen-Image-2.1-viggle-turbo)"
     )
     with gr.Row():
         with gr.Column(scale=1):
@@ -332,7 +426,7 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
                 height=180,
             )
             negative_prompt = gr.Textbox(
-                label="Negative prompt (used only when guidance > 1)",
+                label="Negative prompt (used only when guidance > 1, disabled in turbo mode)",
                 lines=2,
             )
             with gr.Row():
@@ -372,6 +466,14 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
                 value=False,
                 info="Wraps the prompt in the format the checkpoint expects for alpha output.",
             )
+            with gr.Group():
+                gr.Markdown("**Settings**")
+                mode = gr.Radio(
+                    label="Generation mode",
+                    choices=[DEFAULT_MODE, TURBO_MODE],
+                    value=DEFAULT_MODE,
+                    info="Turbo activates the Viggle 4-step LoRA and forces steps=4, CFG off.",
+                )
             run_button = gr.Button("Generate", variant="primary")
             gr.Examples(examples=EXAMPLES, inputs=[prompt], cache_examples=False)
         with gr.Column(scale=1):
@@ -382,6 +484,12 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
                 height=640,
             )
             status = gr.Textbox(label="Run info", lines=3)
+
+    mode.change(
+        fn=_on_mode_change,
+        inputs=[mode],
+        outputs=[num_inference_steps, guidance_scale, negative_prompt],
+    )
 
     run_button.click(
         fn=generate,
@@ -396,6 +504,7 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
             transparent,
             seed,
             randomize_seed,
+            mode,
         ],
         outputs=[result, status],
     )
@@ -404,9 +513,10 @@ with gr.Blocks(title="Qwen-Image-2.1") as demo:
         "ZeroGPU is shared: without an account you get 2 minutes of GPU time per day, "
         "with a free account 5 minutes, with PRO 40 minutes. Every run reserves its window up "
         "front and ZeroGPU charges that reserved time times 1.5, so a 1K image at 40 steps costs "
-        "about 95 seconds of quota and the same image at 8 steps costs 45. A 2K edit with "
-        "reference images runs on the full GPU and is charged double. Lower the step count to "
-        "get more runs. Nothing is stored and the Space keeps nothing between sessions."
+        "about 95 seconds of quota and the same image at 8 steps costs 45; 4-Step Turbo runs at a "
+        "fixed 4 steps and reserves close to the 30s floor. A 2K edit with reference images runs "
+        "on the full GPU and is charged double regardless of mode. Nothing is stored and the "
+        "Space keeps nothing between sessions."
     )
 
 demo.queue().launch()
