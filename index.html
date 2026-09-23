@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Qwen Studio · Image 2.1 PnP</title>
+<title>Qwen Image 2.1 Studio · PnP</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -100,10 +100,22 @@ body{
     display:flex;align-items:center;gap:10px;padding:8px 16px;
     border-bottom:1px solid var(--border);background:var(--panel2);flex-shrink:0;
 }
+.seg-control{
+    display:inline-flex;background:var(--panel);border:1px solid var(--border);
+    border-radius:8px;padding:2px;gap:2px;
+}
+.seg-btn{
+    padding:4px 14px;font-size:11px;font-weight:600;color:var(--dim);
+    background:transparent;border:none;border-radius:6px;cursor:pointer;
+    font-family:'Inter',sans-serif;transition:all .15s;letter-spacing:.2px;
+}
+.seg-btn:hover:not(.active){color:var(--muted)}
+.seg-btn.active{background:rgba(255,255,255,.18);color:var(--accent2)}
 .canvas-meta{
     font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);
     overflow:hidden;white-space:nowrap;text-overflow:ellipsis;flex:1;
 }
+.canvas-actions{display:flex;align-items:center;gap:6px}
 
 .canvas-stage{
     flex:1;position:relative;overflow:hidden;min-height:0;
@@ -117,8 +129,6 @@ body{
     box-shadow:0 12px 48px rgba(0,0,0,.9),0 0 0 1px var(--border);
     border-radius:4px;cursor:zoom-in;image-rendering:auto;
     animation:canvasIn .3s ease;
-    /* Checkerboard for transparency */
-    background: repeating-conic-gradient(#1a1a1a 0% 25%, #222 0% 50%) 0 0/24px 24px;
 }
 @keyframes canvasIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
 .canvas-placeholder{
@@ -144,7 +154,7 @@ body{
     border-radius:50%;animation:spin .8s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-.loader-text{font-size:13px;color:var(--muted);font-weight:500;text-align:center;padding:0 16px}
+.loader-text{font-size:13px;color:var(--muted);font-weight:500;text-align:center;padding:0 16px;max-width:80%;}
 .loader-bar-track{width:220px;height:4px;background:var(--border);border-radius:2px;overflow:hidden}
 .loader-bar-fill{
     height:100%;width:100%;background:linear-gradient(90deg,#ffffff,#e0e0e0,#ffffff);
@@ -248,6 +258,16 @@ body{
 }
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
 
+.suggestions-wrap{display:flex;flex-wrap:wrap;gap:5px}
+.suggestion-chip{
+    display:inline-flex;align-items:center;padding:4px 11px;
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.18);border-radius:14px;
+    color:var(--accent3);font-size:11px;font-weight:500;font-family:'Inter',sans-serif;
+    cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.suggestion-chip:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.35);color:var(--accent2)}
+.suggestion-chip.active{background:rgba(255,255,255,.25);border-color:var(--accent);color:#000}
+
 .lora-native-select{
     width:100%;background:var(--panel2);
     border:1px solid var(--border2);border-radius:8px;
@@ -261,6 +281,17 @@ body{
 }
 .lora-native-select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,255,255,.15)}
 .lora-native-select option{background:var(--panel);color:var(--text)}
+
+.mode-options {
+    display: flex; flex-direction: column; gap: 8px;
+    font-size: 13px; color: var(--muted);
+}
+.mode-options label {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.mode-options input[type="radio"] {
+    accent-color: var(--accent); width: 14px; height: 14px;
+}
 
 .btn-run{
     display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
@@ -303,6 +334,9 @@ body{
     width:14px;height:14px;background:#ffffff;
     border-radius:50%;cursor:pointer;border:none;box-shadow:0 2px 6px rgba(255,255,255,.4);
 }
+.slider-row input[type="range"]:disabled::-webkit-slider-thumb {
+    background: var(--dim); cursor: not-allowed;
+}
 .slider-val{
     min-width:48px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:11px;
     font-weight:500;padding:2px 7px;background:var(--panel2);border:1px solid var(--border);
@@ -319,6 +353,18 @@ body{
 .checkbox-row input[type="checkbox"]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer}
 .checkbox-row label{color:var(--muted);font-size:12px;cursor:pointer}
 
+/* Examples page */
+.examples-list{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.example-card{
+    background:var(--panel2);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s ease;flex-shrink:0;
+    display:flex;align-items:stretch; padding: 10px; align-items: center;
+}
+.example-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(255,255,255,.15)}
+.example-card.loading{opacity:.5;pointer-events:none}
+.example-body{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.example-prompt-text{font-size:12px;color:var(--muted);line-height:1.45;}
+
 /* ══ Status bar ══ */
 .statusbar{
     grid-area:statusbar;background:var(--panel);border-top:1px solid var(--border);
@@ -326,7 +372,7 @@ body{
 }
 .statusbar .sb-section{
     padding:0 10px;display:flex;align-items:center;font-family:'JetBrains Mono',monospace;
-    font-size:11px;color:var(--faint);overflow:hidden;white-space:nowrap;gap:6px;
+    font-size:11px;color:var(--faint);overflow:hidden;white-space:nowrap;gap:6px;flex:1;
 }
 .statusbar .sb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
 .sb-pill{
@@ -391,10 +437,9 @@ body{
 
   <!-- ══ Menu bar ══ -->
   <div class="menubar">
-    <div class="menubar-logo">Q</div>
-    <div class="menubar-title">Qwen Studio <span>/ Image 2.1 PnP</span></div>
-    <span class="menubar-badge">2.1</span>
-    <span class="menubar-badge">ZEROGPU</span>
+    <div class="menubar-logo">Q2</div>
+    <div class="menubar-title">Qwen-Image-2.1 <span>/ PnP</span></div>
+    <span class="menubar-badge">ZeroGPU</span>
     <div class="menubar-spacer"></div>
     <div class="menubar-status"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
     <a href="https://github.com/QwenLM/Qwen-Image-2.1" target="_blank" rel="noopener" class="gh-btn">
@@ -422,10 +467,14 @@ body{
   <!-- ══ Workspace ══ -->
   <div class="workspace">
     <div class="canvas-head">
-      <div class="canvas-meta" id="canvas-meta">No image generated yet</div>
+      <div class="seg-control">
+        <button class="seg-btn active" id="seg-result">Result</button>
+        <button class="seg-btn" id="seg-input">Input</button>
+      </div>
+      <div class="canvas-meta" id="canvas-meta">No image loaded</div>
     </div>
 
-    <div class="canvas-stage" id="canvas-stage">
+    <div class="canvas-stage" id="output-image-container">
       <div class="modern-loader" id="output-loader">
         <div class="loader-spinner"></div>
         <div class="loader-text" id="loader-text">Processing image&hellip;</div>
@@ -440,8 +489,8 @@ body{
         </svg>
         <div class="cp-title">Canvas is empty</div>
         <div class="cp-sub">
-          Drop images anywhere, paste with <kbd>⌘/Ctrl+V</kbd>, or use the rail to upload.<br>
-          Then write an instruction and press <kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd>.
+          Upload reference images for editing, or leave empty for text-to-image.
+          Then write a prompt and press <kbd>⌘/Ctrl</kbd>+<kbd>↵</kbd>.
         </div>
       </div>
     </div>
@@ -459,6 +508,7 @@ body{
   <div class="inspector">
     <div class="inspector-tabs">
       <button class="insp-tab active" id="tab-edit">Generate</button>
+      <button class="insp-tab" id="tab-examples">Examples</button>
     </div>
 
     <!-- Edit page -->
@@ -470,19 +520,36 @@ body{
       </div>
 
       <div class="insp-section">
-        <div class="insp-section-title"><span>Negative Prompt</span></div>
-        <textarea id="custom-negative-input" class="modern-textarea" rows="2"
-                  placeholder="Used only when guidance > 1, disabled in turbo mode..."></textarea>
+        <div class="insp-section-title"><span>Mode</span></div>
+        <div class="mode-options">
+            <label><input type="radio" name="mode" value="None (no LoRA)" checked> None (no LoRA)</label>
+            <label><input type="radio" name="mode" value="4-Step Turbo (Viggle)"> 4-Step Turbo (Viggle)</label>
+            <label><input type="radio" name="mode" value="Object Mover (prithivMLmods)"> Object Mover</label>
+            <label><input type="radio" name="mode" value="Object Remover (prithivMLmods)"> Object Remover</label>
+            <label><input type="radio" name="mode" value="Custom LoRA (enter repo below)"> Custom LoRA</label>
+        </div>
+        <div id="custom-lora-group" style="display:none; margin-top:10px; flex-direction:column; gap:8px;">
+            <input type="text" id="custom-lora-repo" class="modern-textarea" placeholder="Custom LoRA repo id" style="margin-bottom:0;">
+            <input type="text" id="custom-lora-weight" class="modern-textarea" placeholder="Weight file name (optional)" style="margin-bottom:0;">
+        </div>
       </div>
 
       <div class="insp-section">
-        <div class="insp-section-title"><span>Settings</span></div>
+        <button id="custom-run-btn" class="btn-run">
+          <span id="run-btn-label">Generate Image</span>
+        </button>
+        <button id="custom-cancel-btn" class="btn-cancel" style="display:none;">Cancel</button>
+        <div class="run-hint">⌘/Ctrl + Enter</div>
+      </div>
+
+      <div class="insp-section">
+        <div class="insp-section-title"><span>Advanced</span></div>
         <select id="custom-tier" class="lora-native-select">
-            <option value="1K (fast)">1K (fast)</option>
+            <option value="1K (fast)" selected>1K (fast)</option>
             <option value="2K (native)">2K (native)</option>
         </select>
         <select id="custom-aspect" class="lora-native-select">
-            <option value="auto">auto (reference or 1:1)</option>
+            <option value="auto (reference or 1:1)" selected>Auto</option>
             <option value="1:1">1:1</option>
             <option value="4:3">4:3</option>
             <option value="3:4">3:4</option>
@@ -491,33 +558,6 @@ body{
             <option value="16:9">16:9</option>
             <option value="9:16">9:16</option>
         </select>
-      </div>
-
-      <div class="insp-section">
-        <button id="custom-run-btn" class="btn-run">
-          <span id="run-btn-label">Generate Image</span>
-        </button>
-        <div class="run-hint">⌘/Ctrl + Enter</div>
-      </div>
-
-      <div class="insp-section">
-        <div class="insp-section-title"><span>LoRA / Mode</span></div>
-        <select id="custom-mode" class="lora-native-select">
-            <option value="None">None (no LoRA)</option>
-            <option value="4-Step Turbo (Viggle)">4-Step Turbo (Viggle)</option>
-            <option value="Object Mover">Object Mover (prithivMLmods)</option>
-            <option value="Object Remover">Object Remover (prithivMLmods)</option>
-            <option value="Custom LoRA">Custom LoRA (enter repo below)</option>
-        </select>
-        
-        <div id="custom-lora-group" style="display:none; margin-top: 10px;">
-            <input type="text" id="custom-lora-repo" class="modern-textarea" style="margin-bottom:8px; min-height:40px;" placeholder="Custom LoRA repo id (e.g. user/repo)">
-            <input type="text" id="custom-lora-weight" class="modern-textarea" style="min-height:40px;" placeholder="Weight file name (optional)">
-        </div>
-      </div>
-
-      <div class="insp-section">
-        <div class="insp-section-title"><span>Advanced</span></div>
         <div class="slider-row">
           <label>Steps</label>
           <input type="range" id="custom-steps" min="1" max="50" step="1" value="40">
@@ -545,17 +585,22 @@ body{
           <label for="custom-transparent">Transparent background (RGBA)</label>
         </div>
       </div>
-      
+
       <div class="insp-section">
         <div class="insp-section-title"><span>Run Info</span></div>
-        <textarea id="custom-run-info" class="modern-textarea" rows="3" readonly placeholder="Run details will appear here..."></textarea>
+        <textarea id="custom-info" class="modern-textarea" rows="4" readonly placeholder="Run info will appear here..."></textarea>
       </div>
+    </div>
+
+    <!-- Examples page -->
+    <div class="insp-page" id="page-examples">
+      <div class="examples-list" id="examples-scroll"></div>
     </div>
   </div>
 
   <!-- ══ Status bar ══ -->
   <div class="statusbar">
-    <div class="sb-section" id="sb-image-count">No inputs</div>
+    <div class="sb-section" id="sb-image-count">No input</div>
     <div class="sb-right">
       <a class="sb-link" href="https://huggingface.co/Qwen/Qwen-Image-2.1" target="_blank" rel="noopener">Qwen-Image-2.1</a>
       <span class="sb-pill" id="sb-status">Ready</span>
@@ -566,6 +611,11 @@ body{
 
 <input id="custom-file-input" type="file" accept="image/*" multiple style="display:none;" />
 
+<!-- Global drop overlay -->
+<div class="drop-overlay" id="drop-overlay" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;pointer-events:none;backdrop-filter:blur(3px);">
+    <div style="border:3px dashed #fff;border-radius:22px;padding:56px 76px;font-size:19px;font-weight:700;color:#e0e0e0;background:rgba(255,255,255,.06);">Drop images to upload</div>
+</div>
+
 <script type="module">
 import { Client } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
 
@@ -575,34 +625,36 @@ const fileInput    = document.getElementById('custom-file-input');
 const btnUpload    = document.getElementById('tb-upload');
 const btnClear     = document.getElementById('tb-clear');
 const promptInput  = document.getElementById('custom-prompt-input');
-const negativeInput= document.getElementById('custom-negative-input');
 const charCount    = document.getElementById('char-count');
-const tierSelect   = document.getElementById('custom-tier');
-const aspectSelect = document.getElementById('custom-aspect');
-const modeSelect   = document.getElementById('custom-mode');
-const customLoraGroup = document.getElementById('custom-lora-group');
-const customLoraRepo = document.getElementById('custom-lora-repo');
-const customLoraWeight = document.getElementById('custom-lora-weight');
+const tierSel      = document.getElementById('custom-tier');
+const aspectSel    = document.getElementById('custom-aspect');
 const stepsSlider  = document.getElementById('custom-steps');
 const stepsVal     = document.getElementById('custom-steps-val');
 const cfgSlider    = document.getElementById('custom-cfg');
 const cfgVal       = document.getElementById('custom-cfg-val');
 const seedSlider   = document.getElementById('custom-seed');
 const seedVal      = document.getElementById('custom-seed-val');
-const transparentChk = document.getElementById('custom-transparent');
 const randomizeChk = document.getElementById('custom-randomize');
+const transparentChk = document.getElementById('custom-transparent');
+const customLoraRepo = document.getElementById('custom-lora-repo');
+const customLoraWeight = document.getElementById('custom-lora-weight');
+const infoTxt      = document.getElementById('custom-info');
+
 const runBtn       = document.getElementById('custom-run-btn');
 const runBtnLabel  = document.getElementById('run-btn-label');
-const runInfoTxt   = document.getElementById('custom-run-info');
+const cancelBtn    = document.getElementById('custom-cancel-btn');
 const sbStatus     = document.getElementById('sb-status');
 const loader       = document.getElementById('output-loader');
 const loaderText   = document.getElementById('loader-text');
 const loaderFill   = document.getElementById('loader-bar-fill');
-const outBody      = document.getElementById('canvas-stage');
+const outBody      = document.getElementById('output-image-container');
 const outPh        = document.getElementById('output-placeholder');
 const dlBtn        = document.getElementById('dl-btn-output');
 const imgCountTb   = document.getElementById('tb-image-count');
+const dropOverlay  = document.getElementById('drop-overlay');
 const canvasMeta   = document.getElementById('canvas-meta');
+const segResult    = document.getElementById('seg-result');
+const segInput     = document.getElementById('seg-input');
 const connDot      = document.getElementById('conn-dot');
 const connText     = document.getElementById('conn-text');
 
@@ -612,6 +664,7 @@ let toastTimer = null;
 let running = false;
 let currentJob = null;
 let currentResult = null;
+let viewMode = 'result';
 
 /* ── Toast ── */
 function showToast(message, type) {
@@ -639,40 +692,49 @@ function setStatus(text, cls) {
     sbStatus.className = 'sb-pill' + (cls ? ' ' + cls : '');
 }
 
-/* ── Loader ── */
-function showLoader(text) {
-    loaderText.textContent = text || 'Processing image…';
-    loaderFill.classList.remove('determinate');
-    loaderFill.style.width = '100%';
-    loader.classList.add('active');
-    setStatus('Processing…');
+/* ── View mode ── */
+function setViewMode(mode) {
+    viewMode = mode;
+    segResult.classList.toggle('active', mode === 'result');
+    segInput.classList.toggle('active', mode === 'input');
+    renderCanvas();
 }
-function setLoaderProgress(text, frac) {
-    loaderText.textContent = text;
-    if (frac != null && frac >= 0 && frac <= 1) {
-        loaderFill.classList.add('determinate');
-        loaderFill.style.width = Math.max(4, Math.round(frac * 100)) + '%';
-    }
-}
-function hideLoader(statusText, cls) {
-    loader.classList.remove('active');
-    setStatus(statusText || 'Done', cls || 'done');
-}
+segResult.addEventListener('click', () => setViewMode('result'));
+segInput.addEventListener('click', () => setViewMode('input'));
 
-/* ── Canvas Rendering ── */
 function renderCanvas() {
     outBody.querySelectorAll('img.modern-out-img').forEach(e => e.remove());
     
-    if (currentResult) {
+    const showResult = viewMode === 'result' && currentResult;
+    const showInput  = viewMode === 'input' && images.length > 0;
+
+    if (showResult || showInput) {
         outPh.style.display = 'none';
         const img = document.createElement('img');
-        img.src = currentResult;
         img.className = 'modern-out-img';
+        img.addEventListener('click', () => {
+            if (img.src) { 
+                const lb = document.getElementById('lightbox') || document.createElement('div');
+                lb.id = 'lightbox';
+                lb.className = 'lightbox visible';
+                lb.innerHTML = `<img src="${img.src}" alt="zoom">`;
+                lb.onclick = () => lb.classList.remove('visible');
+                document.body.appendChild(lb);
+            }
+        });
+        
+        if (showResult) {
+            img.src = currentResult.b64;
+            canvasMeta.textContent = 'result image';
+        } else {
+            const i = 0; 
+            img.src = images[i].b64;
+            canvasMeta.textContent = 'input image';
+        }
         outBody.appendChild(img);
-        canvasMeta.textContent = 'Result generated';
     } else {
         outPh.style.display = '';
-        canvasMeta.textContent = 'No image generated yet';
+        canvasMeta.textContent = 'No image loaded';
     }
     updateRailState();
 }
@@ -694,16 +756,11 @@ function addImage(b64, name) {
     updateCounts();
 }
 
-function removeImage(idx) {
-    images.splice(idx, 1);
-    renderFilmstrip();
-    updateCounts();
-}
-
 function clearAll() {
     images = [];
     renderFilmstrip();
     updateCounts();
+    if (viewMode === 'input') renderCanvas();
 }
 
 function renderFilmstrip() {
@@ -718,10 +775,10 @@ function renderFilmstrip() {
             const t = document.createElement('div');
             t.className = 'fs-thumb';
             t.innerHTML = '<img src="' + img.b64 + '" alt="">' +
-                          '<span class="fs-badge">ref ' + (i + 1) + '</span>' +
+                          '<span class="fs-badge">#' + (i + 1) + '</span>' +
                           '<button class="fs-remove">✕</button>';
             t.querySelector('.fs-remove').addEventListener('click', (e) => {
-                e.stopPropagation(); removeImage(i);
+                e.stopPropagation(); images.splice(i, 1); renderFilmstrip(); updateCounts(); if (viewMode === 'input') renderCanvas();
             });
             galleryGrid.appendChild(t);
         });
@@ -750,7 +807,70 @@ fileInput.addEventListener('change', (e) => { processFiles(e.target.files); e.ta
 btnUpload.addEventListener('click',  () => fileInput.click());
 btnClear.addEventListener('click',   clearAll);
 
-/* ── Sliders & Inputs ── */
+/* ── Drop anywhere ── */
+let dragDepth = 0;
+window.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes('Files')) return;
+    e.preventDefault(); dragDepth++; dropOverlay.style.display = 'flex';
+});
+window.addEventListener('dragleave', (e) => {
+    if (!e.dataTransfer || !Array.from(e.dataTransfer.types).includes('Files')) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) dropOverlay.style.display = 'none';
+});
+window.addEventListener('dragover', (e) => { e.preventDefault(); });
+window.addEventListener('drop', (e) => {
+    e.preventDefault(); dragDepth = 0; dropOverlay.style.display = 'none';
+    if (e.dataTransfer.files.length) {
+        const n = processFiles(e.dataTransfer.files);
+        if (n > 0) showToast('Added ' + n + ' image(s)', 'info');
+    }
+});
+
+/* ── Inspector tabs ── */
+const tabEdit = document.getElementById('tab-edit');
+const tabExamples = document.getElementById('tab-examples');
+const pageEdit = document.getElementById('page-edit');
+const pageExamples = document.getElementById('page-examples');
+tabEdit.addEventListener('click', () => {
+    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
+    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
+});
+tabExamples.addEventListener('click', () => {
+    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
+    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
+});
+
+/* ── Mode change logic ── */
+document.querySelectorAll('input[name="mode"]').forEach(input => {
+    input.addEventListener('change', (e) => {
+        const mode = e.target.value;
+        const isTurbo = mode === '4-Step Turbo (Viggle)';
+        const isCustom = mode === 'Custom LoRA (enter repo below)';
+        
+        if (isTurbo) {
+            stepsSlider.value = 4;
+            stepsSlider.disabled = true;
+            stepsVal.textContent = 4;
+            
+            cfgSlider.value = 1.0;
+            cfgSlider.disabled = true;
+            cfgVal.textContent = 1.0;
+        } else {
+            stepsSlider.value = 40;
+            stepsSlider.disabled = false;
+            stepsVal.textContent = 40;
+            
+            cfgSlider.value = 1.0;
+            cfgSlider.disabled = false;
+            cfgVal.textContent = 1.0;
+        }
+        
+        document.getElementById('custom-lora-group').style.display = isCustom ? 'flex' : 'none';
+    });
+});
+
+/* ── Sliders ── */
 function bindSlider(id) {
     const slider  = document.getElementById(id);
     const valSpan = document.getElementById(id + '-val');
@@ -767,38 +887,31 @@ document.getElementById('dice-btn').addEventListener('click', () => {
 
 promptInput.addEventListener('input', () => charCount.textContent = promptInput.value.length);
 
-/* ── Mode Switching ── */
-modeSelect.addEventListener('change', (e) => {
-    const mode = e.target.value;
-    const isCustom = mode === 'Custom LoRA';
-    const isTurbo = mode === '4-Step Turbo (Viggle)';
-    
-    customLoraGroup.style.display = isCustom ? 'block' : 'none';
-    
-    if (isTurbo) {
-        stepsSlider.value = 4;
-        stepsVal.textContent = 4;
-        stepsSlider.disabled = true;
-        cfgSlider.value = 1.0;
-        cfgVal.textContent = 1.0;
-        cfgSlider.disabled = true;
-        negativeInput.disabled = true;
-    } else {
-        stepsSlider.value = 40;
-        stepsVal.textContent = 40;
-        stepsSlider.disabled = false;
-        cfgSlider.value = 1.0;
-        cfgVal.textContent = 1.0;
-        cfgSlider.disabled = false;
-        negativeInput.disabled = false;
+/* ── Loader ── */
+function showLoader(text) {
+    loaderText.textContent = text || 'Processing image…';
+    loaderFill.classList.remove('determinate');
+    loaderFill.style.width = '100%';
+    loader.classList.add('active');
+    setStatus('Processing…');
+}
+function setLoaderProgress(text, frac) {
+    loaderText.textContent = text;
+    if (frac != null && frac >= 0 && frac <= 1) {
+        loaderFill.classList.add('determinate');
+        loaderFill.style.width = Math.max(4, Math.round(frac * 100)) + '%';
     }
-});
+}
+function hideLoader(statusText, cls) {
+    loader.classList.remove('active');
+    setStatus(statusText || 'Done', cls || 'done');
+}
 
 /* ── Download ── */
 dlBtn.addEventListener('click', () => {
-    if (currentResult) {
+    if (currentResult && currentResult.b64) {
         const a = document.createElement('a');
-        a.href = currentResult;
+        a.href = currentResult.b64;
         a.download = 'qwen_image_result.png';
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
@@ -818,11 +931,65 @@ try {
     showToast('Could not connect to the backend API', 'error');
 }
 
+/* ── Config: examples ── */
+function renderConfig(cfg) {
+    const list = document.getElementById('examples-scroll');
+    list.innerHTML = '';
+    cfg.examples.forEach(ex => {
+        const card = document.createElement('div');
+        card.className = 'example-card';
+        const promptShort = ex.prompt.length > 90 ? ex.prompt.slice(0, 90) + '…' : ex.prompt;
+        card.innerHTML = `<div class="example-body"><div class="example-prompt-text">${promptShort}</div></div>`;
+        card.addEventListener('click', () => loadExample(card, ex.idx));
+        list.appendChild(card);
+    });
+}
+
+async function loadExample(card, idx) {
+    if (!client) { showToast('Backend not connected', 'error'); return; }
+    document.querySelectorAll('.example-card.loading').forEach(c => c.classList.remove('loading'));
+    card.classList.add('loading');
+    showToast('Loading example…', 'info');
+    try {
+        const result = await client.predict('/load_example', { idx: idx });
+        const data = result.data[0];
+        if (data && data.status === 'ok') {
+            promptInput.value = data.prompt;
+            charCount.textContent = promptInput.value.length;
+            // Select "None" mode
+            document.querySelector('input[name="mode"][value="None (no LoRA)').checked = true;
+            document.getElementById('custom-lora-group').style.display = 'none';
+            stepsSlider.disabled = false; cfgSlider.disabled = false;
+            
+            clearAll();
+            tabEdit.click();
+            showToast('Example loaded', 'info');
+        } else {
+            showToast('Could not load example', 'error');
+        }
+    } catch (e) {
+        console.error('Example load error:', e);
+        showToast('Could not load example', 'error');
+    } finally {
+        card.classList.remove('loading');
+    }
+}
+
+try {
+    const cfg = await fetch('api/config').then(r => r.json());
+    renderConfig(cfg);
+} catch (e) {
+    console.error('Failed to load config:', e);
+}
+
 /* ── Run ── */
+let currentJob = null;
+
 function setRunningUI(on) {
     running = on;
     runBtn.disabled = on;
     runBtnLabel.textContent = on ? 'Generating…' : 'Generate Image';
+    cancelBtn.style.display = on ? 'flex' : 'none';
 }
 
 async function runEdit() {
@@ -832,21 +999,24 @@ async function runEdit() {
     if (!promptVal) { showToast('Please enter a prompt', 'warning'); return; }
 
     setRunningUI(true);
+    setViewMode('result');
     showLoader('Submitting to queue…');
     dlBtn.disabled = true;
 
+    const selectedMode = document.querySelector('input[name="mode"]:checked').value;
+    
     const payload = {
-        prompt: promptVal,
-        negative_prompt: negativeInput.value,
         images_b64_json: JSON.stringify(images.map(img => img.b64)),
-        tier: tierSelect.value,
-        aspect_ratio: aspectSelect.value,
+        prompt: promptVal,
+        negative_prompt: "", // Can be added to UI if needed
+        tier: tierSel.value,
+        aspect_ratio: aspectSel.value,
         num_inference_steps: parseInt(stepsSlider.value),
         guidance_scale: parseFloat(cfgSlider.value),
         transparent: transparentChk.checked,
-        seed: parseInt(seedSlider.value),
+        seed: parseInt(seedSlider.value) || 0,
         randomize_seed: randomizeChk.checked,
-        mode: modeSelect.value,
+        mode: selectedMode,
         custom_lora_repo: customLoraRepo.value,
         custom_lora_weight: customLoraWeight.value,
     };
@@ -881,16 +1051,16 @@ async function runEdit() {
             } else if (msg.type === 'data') {
                 const out = msg.data && msg.data[0];
                 if (out && out.image) {
-                    currentResult = out.image;
+                    currentResult = { b64: out.image };
+                    infoTxt.value = out.info || '';
                     if (out.seed != null) {
                         seedSlider.value = out.seed;
                         seedVal.textContent = out.seed;
                     }
-                    runInfoTxt.value = out.info || '';
                     hideLoader('Done', 'done');
                     showToast('Image generated successfully', 'info');
+                    dlBtn.disabled = false; 
                     renderCanvas();
-                    dlBtn.disabled = false; // Enable download
                 } else {
                     hideLoader('Done', 'done');
                 }
@@ -908,6 +1078,16 @@ async function runEdit() {
 }
 
 runBtn.addEventListener('click', runEdit);
+
+cancelBtn.addEventListener('click', async () => {
+    if (currentJob) {
+        try { await currentJob.cancel(); } catch (e) { console.warn('Cancel error:', e); }
+        currentJob = null;
+    }
+    setRunningUI(false);
+    hideLoader('Cancelled');
+    showToast('Generation cancelled', 'warning');
+});
 
 document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
