@@ -1,0 +1,32 @@
+[project]
+name = "qwen-image-2-1-loras-pnp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Prithiv Sakthi U R", email = "prithivsakthi676@gmail.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "accelerate==1.14.0",
+    "av==17.1.0",
+    "diffusers",
+    "gradio==6.28.0",
+    "huggingface-hub>=1.24.0",
+    "peft==0.19.1",
+    "pillow>=12.3.0",
+    "spaces>=0.51.1",
+    "torch==2.11.0",
+    "torchvision==0.26.0",
+    "transformers==5.17.0",
+]
+
+[project.scripts]
+qwen-image-2-1-loras-pnp = "qwen_image_2_1_loras_pnp:main"
+
+[build-system]
+requires = ["uv_build>=0.12.13,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+diffusers = { git = "https://github.com/huggingface/diffusers.git" }
