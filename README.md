@@ -25,6 +25,12 @@ The platform integrates a dynamic LoRA loading system supporting pre-configured 
 ### **Repository Structure**
 
 ```text
+├── assets/
+│   ├── Screenshot From 2026-09-24 09-58-52.png
+│   ├── Screenshot From 2026-09-24 10-17-31.png
+│   ├── Screenshot From 2026-09-24 10-19-56.png
+│   ├── Screenshot From 2026-09-24 10-38-22.png
+│   └── Screenshot From 2026-09-24 10-40-29.png
 ├── app.py
 ├── index.html
 ├── LICENSE
