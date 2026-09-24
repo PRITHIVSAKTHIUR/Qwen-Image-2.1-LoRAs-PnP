@@ -1,4 +1,4 @@
-# **Qwen-Image-2.1-LoRAs-PnP**
+# **[Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP)**
 
 Qwen-Image-2.1-LoRAs-PnP is a flexible, plug-and-play image synthesis and editing platform built on top of the `Qwen/Qwen-Image-2.1` diffusion pipeline. Operating natively in `bfloat16`, the application consolidates text-to-image synthesis, multi-reference image editing, and transparent background (RGBA) generation inside a single unified framework.
 
