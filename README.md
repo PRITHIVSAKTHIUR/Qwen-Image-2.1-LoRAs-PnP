@@ -4,6 +4,10 @@ Qwen-Image-2.1-LoRAs-PnP is a flexible, plug-and-play image synthesis and editin
 
 The platform integrates a dynamic LoRA loading system supporting pre-configured community checkpoints—including 4-Step Turbo distillation (`Viggle/Qwen-Image-2.1-viggle-turbo`), spatial object manipulation (`Object Mover` and `Object Remover`), and `Natural Exposure`—along with support for arbitrary Hugging Face LoRA repositories. Built with a FastAPI backend server (`gradio.Server`) and a dark-mode frontend workspace, it includes image filmstrips, multi-reference queues, and an inspection engine.
 
+<img width="1911" height="891" alt="Screenshot From 2026-09-24 10-17-31" src="https://github.com/user-attachments/assets/baac2b84-457f-4350-aa3a-124d5996134a" />
+
+<img width="1911" height="891" alt="Screenshot From 2026-09-24 10-40-29" src="https://github.com/user-attachments/assets/c41baabf-a89b-489a-a500-431a1355232a" />
+
 ### **Key Features**
 
 * **Unified T2I, I2I & Multi-Reference Workflows:** Execute prompt-based generations or supply up to 10 visual references simultaneously for guided scene modifications, asset transpositions, and character editing.
