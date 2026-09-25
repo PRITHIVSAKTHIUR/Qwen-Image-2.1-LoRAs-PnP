@@ -4,9 +4,10 @@ Qwen-Image-2.1-LoRAs-PnP is a flexible, plug-and-play image synthesis and editin
 
 The platform integrates a dynamic LoRA loading system supporting pre-configured community checkpoints—including 4-Step Turbo distillation (`Viggle/Qwen-Image-2.1-viggle-turbo`), spatial object manipulation (`Object Mover` and `Object Remover`), and `Natural Exposure`—along with support for arbitrary Hugging Face LoRA repositories. Built with a FastAPI backend server (`gradio.Server`) and a dark-mode frontend workspace, it includes image filmstrips, multi-reference queues, and an inspection engine.
 
-<img width="1911" height="891" alt="Screenshot From 2026-09-24 10-17-31" src="https://github.com/user-attachments/assets/baac2b84-457f-4350-aa3a-124d5996134a" />
 
-<img width="1911" height="891" alt="Screenshot From 2026-09-24 10-40-29" src="https://github.com/user-attachments/assets/c41baabf-a89b-489a-a500-431a1355232a" />
+<img width="1920" height="895" alt="Screenshot From 2026-09-25 09-14-12" src="https://github.com/user-attachments/assets/07250cf7-8fc6-4bfb-9b0e-0e4e0fcaf079" />
+<img width="1920" height="895" alt="Screenshot From 2026-09-25 08-45-02" src="https://github.com/user-attachments/assets/3eaf2942-c818-41aa-b418-afa4e842ee3e" />
+<img width="1920" height="895" alt="Screenshot From 2026-09-25 08-44-53" src="https://github.com/user-attachments/assets/7956eb11-5cf4-49b6-84bc-9bdeedf61d37" />
 
 ### **Key Features**
 
