@@ -129,14 +129,33 @@ body{
     display:flex;align-items:center;justify-content:center;
     background:
         repeating-conic-gradient(#0c0c0f 0% 25%, #08080a 0% 50%) 0 0/24px 24px;
+    padding: 24px;
 }
-.canvas-stage img.modern-out-img{
-    max-width:calc(100% - 48px);max-height:calc(100% - 48px);
-    box-shadow:0 12px 48px rgba(0,0,0,.7),0 0 0 1px var(--border);
-    border-radius:4px;cursor:zoom-in;image-rendering:auto;
-    animation:canvasIn .3s ease;
+
+#board-wrapper {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    display: none;
 }
-@keyframes canvasIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:scale(1)}}
+#main-image {
+    background: #ffffff;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    max-width: 100%;
+    max-height: calc(100vh - 220px);
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    box-shadow: 0 12px 48px rgba(0,0,0,.9);
+    display: block;
+}
+#bbox-canvas {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+}
+
 .canvas-placeholder{
     text-align:center;color:var(--faint);user-select:none;
     display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px;
@@ -152,7 +171,7 @@ body{
 /* Loader */
 .modern-loader{
     display:none;position:absolute;inset:0;background:rgba(8,8,10,.9);
-    z-index:15;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(5px);
+    z-index:100;flex-direction:column;align-items:center;justify-content:center;gap:16px;backdrop-filter:blur(5px);
 }
 .modern-loader.active{display:flex}
 .loader-spinner{
@@ -263,16 +282,6 @@ body{
     border-color:#ef4444!important;box-shadow:0 0 0 3px rgba(239,68,68,.2)!important;animation:shake .4s ease;
 }
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-4px)}40%,80%{transform:translateX(4px)}}
-
-.suggestions-wrap{display:flex;flex-wrap:wrap;gap:5px}
-.suggestion-chip{
-    display:inline-flex;align-items:center;padding:4px 11px;
-    background:rgba(30,144,255,.07);border:1px solid rgba(30,144,255,.18);border-radius:14px;
-    color:var(--accent3);font-size:11px;font-weight:500;font-family:'Inter',sans-serif;
-    cursor:pointer;transition:all .15s;white-space:nowrap;
-}
-.suggestion-chip:hover{background:rgba(30,144,255,.15);border-color:rgba(30,144,255,.35);color:var(--accent2)}
-.suggestion-chip.active{background:rgba(30,144,255,.25);border-color:var(--accent);color:#fff}
 
 .btn-run{
     display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
@@ -421,10 +430,6 @@ body{
     .workspace{min-height:0} .canvas-head{flex-wrap:wrap;gap:8px;padding:8px 12px}
     .canvas-meta{flex-basis:100%;order:3;font-size:10px} 
     .canvas-stage{padding:12px}
-    .canvas-stage img.modern-out-img{max-width:calc(100% - 20px);max-height:52vh}
-    .canvas-placeholder .cp-sub{font-size:11px;max-width:280px}
-    .filmstrip{flex-direction:column;height:auto;max-height:none} .filmstrip-section{padding:8px 0 8px 12px}
-    .fs-thumb{width:68px;height:68px} .fs-add{width:68px;height:68px} .fs-empty{height:68px}
     .inspector{border-left:none;border-top:1px solid var(--border)}
     .inspector-tabs{position:sticky;top:0;background:var(--panel);z-index:30}
     .insp-tab{padding:13px 8px;font-size:12px} .insp-page{overflow-y:visible} .insp-section{padding:14px 16px}
@@ -459,6 +464,22 @@ body{
     <button class="rail-btn" id="tb-clear" title="Clear all images" disabled>
       <svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
     </button>
+    
+    <div class="rail-sep"></div>
+    <div class="rail-label">BBox</div>
+    <button class="rail-btn" id="btn-bbox" title="Draw Bounding Box">
+      <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="1"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-undo-bbox" title="Undo BBox" disabled>
+      <svg viewBox="0 0 24 24"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-redo-bbox" title="Redo BBox" disabled>
+      <svg viewBox="0 0 24 24"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>
+    </button>
+    <button class="rail-btn" id="btn-clear-bbox" title="Clear BBoxes" disabled>
+      <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+
     <div class="rail-sep"></div>
     <div class="rail-label">Result</div>
     <button class="rail-btn" id="dl-btn-output" title="Download result" disabled>
@@ -487,6 +508,11 @@ body{
         <div class="loader-spinner"></div>
         <div class="loader-text" id="loader-text">Processing image&hellip;</div>
         <div class="loader-bar-track"><div class="loader-bar-fill" id="loader-bar-fill"></div></div>
+      </div>
+
+      <div id="board-wrapper">
+          <img id="main-image" src="" alt="">
+          <canvas id="bbox-canvas"></canvas>
       </div>
 
       <div class="canvas-placeholder" id="canvas-placeholder">
@@ -671,6 +697,16 @@ const segInput     = document.getElementById('seg-input');
 const connDot      = document.getElementById('conn-dot');
 const connText     = document.getElementById('conn-text');
 
+const boardWrapper = document.getElementById('board-wrapper');
+const mainImage = document.getElementById('main-image');
+const bboxCanvas = document.getElementById('bbox-canvas');
+const bboxCtx = bboxCanvas.getContext('2d');
+
+const btnBbox = document.getElementById('btn-bbox');
+const btnUndoBbox = document.getElementById('btn-undo-bbox');
+const btnRedoBbox = document.getElementById('btn-redo-bbox');
+const btnClearBbox = document.getElementById('btn-clear-bbox');
+
 /* ── State ── */
 let images = [];
 let toastTimer = null;
@@ -678,6 +714,13 @@ let running = false;
 let currentJob = null;
 let currentResult = null;
 let viewMode = 'result';
+
+let bboxes = [];
+let undoStack = [];
+let redoStack = [];
+let isDrawingBbox = false;
+let startX = 0, startY = 0;
+let currentTool = 'none';
 
 /* ── Toast ── */
 function showToast(message, type) {
@@ -715,34 +758,48 @@ function setViewMode(mode) {
 segResult.addEventListener('click', () => setViewMode('result'));
 segInput.addEventListener('click', () => setViewMode('input'));
 
-function getCanvasImg() { return outBody.querySelector('img.modern-out-img'); }
-
 function renderCanvas() {
-    let img = getCanvasImg();
     const showResult = viewMode === 'result' && currentResult;
     const showInput  = viewMode === 'input' && images.length > 0;
 
     if (showResult || showInput) {
         outPh.style.display = 'none';
-        if (!img) {
-            img = document.createElement('img');
-            img.className = 'modern-out-img';
-            img.addEventListener('click', () => {
-                if (img.src) { lightboxImg.src = img.src; lightbox.classList.add('visible'); }
-            });
-            outBody.appendChild(img);
-        }
-        img.style.display = '';
+        boardWrapper.style.display = 'block';
+        
+        mainImage.onload = () => {
+            boardWrapper.style.aspectRatio = `${mainImage.naturalWidth} / ${mainImage.naturalHeight}`;
+            bboxCanvas.width = mainImage.naturalWidth;
+            bboxCanvas.height = mainImage.naturalHeight;
+            
+            // Only draw bounding boxes if in INPUT view
+            if (showInput) {
+                drawBboxes();
+            } else {
+                // Clear any existing boxes from the canvas if in RESULT view
+                bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
+            }
+        };
+        
         if (showResult) {
-            img.src = currentResult.b64;
+            mainImage.src = currentResult.b64;
             canvasMeta.textContent = 'result · seed ' + currentResult.seed;
+            bboxCanvas.style.display = 'none'; // Hide overlay completely in Result view
+            
+            // Turn off bbox drawing tool if switching to result view
+            if (currentTool === 'bbox') {
+                currentTool = 'none';
+                btnBbox.classList.remove('active');
+                bboxCanvas.style.pointerEvents = 'none';
+                bboxCanvas.style.cursor = 'default';
+            }
         } else {
-            const i = 0; // Always show first image as main input preview
-            img.src = images[i].b64;
-            canvasMeta.textContent = 'input #' + (i + 1) + ' · ' + (images[i].name || 'image');
+            mainImage.src = images[0].b64;
+            canvasMeta.textContent = 'input #1 · ' + (images[0].name || 'image');
+            bboxCanvas.style.display = 'block'; // Show overlay in Input view
         }
     } else {
-        if (img) img.style.display = 'none';
+        boardWrapper.style.display = 'none';
+        bboxCanvas.style.display = 'none';
         outPh.style.display = '';
         canvasMeta.textContent = images.length > 0
             ? images.length + ' input' + (images.length > 1 ? 's' : '') + ' ready — run an edit'
@@ -757,6 +814,129 @@ function updateRailState() {
     zoomBtn.disabled = !hasResult && images.length === 0;
     btnClear.disabled = images.length === 0;
 }
+
+/* ── BBox Logic ── */
+function drawBboxes() {
+    bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
+    bboxCtx.strokeStyle = '#FF0000';
+    bboxCtx.lineWidth = Math.max(2, bboxCanvas.width / 200);
+    
+    bboxes.forEach(b => {
+        bboxCtx.beginPath();
+        bboxCtx.rect(b.x, b.y, b.w, b.h);
+        bboxCtx.stroke();
+    });
+    
+    btnUndoBbox.disabled = bboxes.length === 0;
+    btnRedoBbox.disabled = redoStack.length === 0;
+    btnClearBbox.disabled = bboxes.length === 0;
+}
+
+function getBboxPos(e) {
+    const rect = bboxCanvas.getBoundingClientRect();
+    const scaleX = bboxCanvas.width / rect.width;
+    const scaleY = bboxCanvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+        x: (clientX - rect.left) * scaleX,
+        y: (clientY - rect.top) * scaleY
+    };
+}
+
+bboxCanvas.addEventListener('mousedown', (e) => {
+    if (currentTool !== 'bbox' || viewMode !== 'input') return;
+    e.preventDefault();
+    isDrawingBbox = true;
+    const pos = getBboxPos(e);
+    startX = pos.x;
+    startY = pos.y;
+});
+
+bboxCanvas.addEventListener('mousemove', (e) => {
+    if (!isDrawingBbox) return;
+    e.preventDefault();
+    const pos = getBboxPos(e);
+    bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
+    bboxes.forEach(b => {
+        bboxCtx.beginPath();
+        bboxCtx.rect(b.x, b.y, b.w, b.h);
+        bboxCtx.stroke();
+    });
+    const w = pos.x - startX;
+    const h = pos.y - startY;
+    bboxCtx.beginPath();
+    bboxCtx.rect(startX, startY, w, h);
+    bboxCtx.stroke();
+});
+
+bboxCanvas.addEventListener('mouseup', (e) => {
+    if (!isDrawingBbox) return;
+    e.preventDefault();
+    isDrawingBbox = false;
+    const pos = getBboxPos(e);
+    const w = pos.x - startX;
+    const h = pos.y - startY;
+    if (Math.abs(w) > 5 && Math.abs(h) > 5) {
+        undoStack.push([...bboxes]);
+        redoStack = [];
+        bboxes.push({
+            x: w < 0 ? pos.x : startX,
+            y: h < 0 ? pos.y : startY,
+            w: Math.abs(w),
+            h: Math.abs(h)
+        });
+    }
+    drawBboxes();
+});
+
+bboxCanvas.addEventListener('mouseleave', (e) => {
+    if (isDrawingBbox) {
+        isDrawingBbox = false;
+        drawBboxes();
+    }
+});
+
+btnBbox.addEventListener('click', () => {
+    if (viewMode !== 'input') {
+        showToast('Please switch to Input view to draw BBoxes', 'warning');
+        return;
+    }
+    currentTool = currentTool === 'bbox' ? 'none' : 'bbox';
+    btnBbox.classList.toggle('active');
+    if (currentTool === 'bbox') {
+        bboxCanvas.style.pointerEvents = 'auto';
+        bboxCanvas.style.cursor = 'crosshair';
+    } else {
+        bboxCanvas.style.pointerEvents = 'none';
+        bboxCanvas.style.cursor = 'default';
+    }
+});
+
+btnUndoBbox.addEventListener('click', () => {
+    if (bboxes.length > 0) {
+        redoStack.push([...bboxes]);
+        bboxes = undoStack.pop();
+        drawBboxes();
+    }
+});
+
+btnRedoBbox.addEventListener('click', () => {
+    if (redoStack.length > 0) {
+        undoStack.push([...bboxes]);
+        bboxes = redoStack.pop();
+        drawBboxes();
+    }
+});
+
+btnClearBbox.addEventListener('click', () => {
+    if (bboxes.length > 0) {
+        undoStack.push([...bboxes]);
+        redoStack = [];
+        bboxes = [];
+        drawBboxes();
+    }
+});
 
 /* ── Inputs filmstrip ── */
 function updateCounts() {
@@ -860,15 +1040,11 @@ loraSelect.addEventListener('change', (e) => {
         cfgSlider.value = 1.0; cfgVal.textContent = '1.0';
         cfgSlider.disabled = true;
         negPromptInput.disabled = true;
-        
-        // Auto-set GPU duration to 30s for Turbo
         gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
     } else {
         stepsSlider.disabled = false;
         cfgSlider.disabled = false;
         negPromptInput.disabled = false;
-        
-        // Revert GPU duration to 90s if it was lowered to 30 by turbo
         if (parseInt(gpuDurSl.value) === 30) {
             gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
         }
@@ -899,7 +1075,6 @@ function hideLoader(statusText, cls) {
 lightbox.addEventListener('click', () => lightbox.classList.remove('visible'));
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lightbox.classList.remove('visible'); });
 zoomBtn.addEventListener('click', () => {
-    const img = getCanvasImg();
     const src = (viewMode === 'result' && currentResult) ? currentResult.b64
               : (images.length ? images[0].b64 : null);
     if (src) { lightboxImg.src = src; lightbox.classList.add('visible'); }
@@ -951,10 +1126,35 @@ async function runEdit() {
     setViewMode('result');
     showLoader('Submitting to queue…');
 
+    let payloadImages = [...images];
+    
+    // Composite bboxes onto the first image if they exist
+    if (payloadImages.length > 0 && bboxes.length > 0) {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = bboxCanvas.width;
+        tempCanvas.height = bboxCanvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        const img = new Image();
+        img.src = payloadImages[0].b64;
+        await new Promise(resolve => { img.onload = resolve; });
+        tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+        
+        tempCtx.strokeStyle = '#FF0000';
+        tempCtx.lineWidth = Math.max(2, tempCanvas.width / 200);
+        bboxes.forEach(b => {
+            tempCtx.beginPath();
+            tempCtx.rect(b.x, b.y, b.w, b.h);
+            tempCtx.stroke();
+        });
+        
+        payloadImages[0] = { ...payloadImages[0], b64: tempCanvas.toDataURL('image/png') };
+    }
+
     const payload = {
         prompt: promptInput.value,
         negative_prompt: negPromptInput.value,
-        images_b64_json: JSON.stringify(images.map(img => img.b64)),
+        images_b64_json: JSON.stringify(payloadImages.map(img => img.b64)),
         tier: tierSelect.value,
         aspect_ratio: aspectSelect.value,
         num_inference_steps: parseInt(stepsSlider.value),
