@@ -139,6 +139,8 @@ body{
     display: none;
 }
 #main-image {
+    position: relative;
+    z-index: 1;
     background: #ffffff;
     border: 1px solid var(--border2);
     border-radius: 4px;
@@ -154,6 +156,7 @@ body{
     position: absolute;
     top: 0; left: 0; width: 100%; height: 100%;
     pointer-events: none;
+    z-index: 2;
 }
 
 .canvas-placeholder{
@@ -925,8 +928,13 @@ function updateCounts() {
 
 function addImage(b64, name) {
     images.push({id: Date.now() + Math.random(), b64, name});
+    if (!currentResult) {
+        viewMode = 'input';
+        segResult.classList.remove('active');
+        segInput.classList.add('active');
+    }
     renderFilmstrip(); updateCounts();
-    if (viewMode === 'input' || !currentResult) renderCanvas();
+    renderCanvas();
 }
 
 function removeImage(idx) {
@@ -1108,21 +1116,25 @@ async function runEdit() {
     
     // Composite bboxes onto the first image if they exist
     if (payloadImages.length > 0 && bboxes.length > 0) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = bboxCanvas.width;
-        tempCanvas.height = bboxCanvas.height;
-        const tempCtx = tempCanvas.getContext('2d');
-        
         const img = new Image();
         img.src = payloadImages[0].b64;
         await new Promise(resolve => { img.onload = resolve; });
-        tempCtx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.naturalWidth;
+        tempCanvas.height = img.naturalHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(img, 0, 0);
+        
+        // Scale bboxes to the original image's natural resolution
+        const scaleX = tempCanvas.width / bboxCanvas.width;
+        const scaleY = tempCanvas.height / bboxCanvas.height;
         
         tempCtx.strokeStyle = '#FF0000';
         tempCtx.lineWidth = Math.max(2, tempCanvas.width / 200);
         bboxes.forEach(b => {
             tempCtx.beginPath();
-            tempCtx.rect(b.x, b.y, b.w, b.h);
+            tempCtx.rect(b.x * scaleX, b.y * scaleY, b.w * scaleX, b.h * scaleY);
             tempCtx.stroke();
         });
         
