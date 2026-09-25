@@ -802,12 +802,10 @@ function drawBboxes() {
     bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
     bboxCtx.strokeStyle = '#FF0000';
     bboxCtx.lineWidth = Math.max(2, bboxCanvas.width / 200);
-    bboxCtx.fillStyle = 'rgba(255, 0, 0, 0.2)';
     
     bboxes.forEach(b => {
         bboxCtx.beginPath();
         bboxCtx.rect(b.x, b.y, b.w, b.h);
-        bboxCtx.fill();
         bboxCtx.stroke();
     });
     
@@ -845,14 +843,12 @@ bboxCanvas.addEventListener('mousemove', (e) => {
     bboxes.forEach(b => {
         bboxCtx.beginPath();
         bboxCtx.rect(b.x, b.y, b.w, b.h);
-        bboxCtx.fill();
         bboxCtx.stroke();
     });
     const w = pos.x - startX;
     const h = pos.y - startY;
     bboxCtx.beginPath();
     bboxCtx.rect(startX, startY, w, h);
-    bboxCtx.fill();
     bboxCtx.stroke();
 });
 
@@ -1124,11 +1120,9 @@ async function runEdit() {
         
         tempCtx.strokeStyle = '#FF0000';
         tempCtx.lineWidth = Math.max(2, tempCanvas.width / 200);
-        tempCtx.fillStyle = 'rgba(255, 0, 0, 0.2)';
         bboxes.forEach(b => {
             tempCtx.beginPath();
             tempCtx.rect(b.x, b.y, b.w, b.h);
-            tempCtx.fill();
             tempCtx.stroke();
         });
         
