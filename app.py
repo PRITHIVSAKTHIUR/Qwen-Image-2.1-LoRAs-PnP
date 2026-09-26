@@ -83,44 +83,20 @@ ASPECTS = ["auto (reference or 1:1)", "1:1", "4:3", "3:4", "3:2", "2:3", "16:9",
 RGBA_PREFIX = "This is an RGBA image with transparency. "
 RGBA_SUFFIX = " The image has alpha channel and the background is transparent."
 
-# --- Examples Config ---
 EXAMPLES_CONFIG = [
-    {"images": ["examples/3.jpeg", "examples/4.jpeg"], "prompt": "Make her wear these glasses in Image 2."},
-    {"images": ["examples/1.jpeg", "examples/2.jpeg"], "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k"},
-    {"images": ["examples/5.jpeg"], "prompt": "Change the weather to stormy."}
+    {
+        "images": ["examples/3.jpeg", "examples/4.jpeg"], 
+        "prompt": "Make her wear these glasses in Image 2."
+    },
+    {
+        "images": ["examples/1.jpeg", "examples/2.jpeg"], 
+        "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k"
+    },
+    {
+        "images": ["examples/5.jpeg"], 
+        "prompt": "Change the weather to stormy."
+    }
 ]
-
-def make_thumb_b64(path, max_dim=220):
-    if not os.path.exists(path): return ""
-    try:
-        img = Image.open(path).convert("RGB")
-        img.thumbnail((max_dim, max_dim), Image.LANCZOS)
-        buf = BytesIO()
-        img.save(buf, format="JPEG", quality=65)
-        return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
-    except: return ""
-
-def encode_full_image(path):
-    if not os.path.exists(path): return ""
-    try:
-        with open(path, "rb") as f: data = f.read()
-        ext = path.rsplit(".", 1)[-1].lower()
-        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
-        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
-    except: return ""
-
-def build_client_config():
-    examples = []
-    for i, ex in enumerate(EXAMPLES_CONFIG):
-        examples.append({
-            "idx": i,
-            "thumbs": [make_thumb_b64(p) for p in ex["images"]],
-            "n_images": len(ex["images"]),
-            "prompt": ex["prompt"],
-        })
-    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "examples": examples}
-
-CLIENT_CONFIG = build_client_config()
 
 print(f"Loading {MODEL_ID} ...", flush=True)
 pipe = QwenImage21Pipeline.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16).to("cuda")
@@ -288,6 +264,30 @@ def pil_to_b64_png(image: Image.Image) -> str:
     image.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
+def make_thumb_b64(path, max_dim=220):
+    if not os.path.exists(path):
+        return ""
+    try:
+        img = Image.open(path).convert("RGB")
+        img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format="JPEG", quality=65)
+        return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
+    except Exception:
+        return ""
+
+def encode_full_image(path):
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path, "rb") as f:
+            data = f.read()
+        ext = path.rsplit(".", 1)[-1].lower()
+        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
+        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+    except Exception:
+        return ""
+
 def generate(
     prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
     guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
@@ -411,7 +411,15 @@ def load_example(idx: float) -> dict:
 
 @app.get("/api/config")
 def client_config():
-    return CLIENT_CONFIG
+    examples_payload = []
+    for i, ex in enumerate(EXAMPLES_CONFIG):
+        examples_payload.append({
+            "idx": i,
+            "thumbs": [make_thumb_b64(p) for p in ex["images"]],
+            "n_images": len(ex["images"]),
+            "prompt": ex["prompt"],
+        })
+    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "examples": examples_payload}
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
