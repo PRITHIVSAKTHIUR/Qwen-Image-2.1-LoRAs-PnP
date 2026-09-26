@@ -369,19 +369,32 @@ body{
     font-family: 'Inter', sans-serif; font-style: italic;
 }
 
-/* Examples Page */
-.examples-list { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-.example-card {
-    background: var(--panel2); border: 1px solid var(--border);
-    border-radius: 10px; overflow: hidden; cursor: pointer; transition: all .2s ease;
-    display: flex; align-items: stretch;
+/* Examples page */
+.examples-list{padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.example-card{
+    background:var(--panel2);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s ease;flex-shrink:0;
+    display:flex;align-items:stretch;
 }
-.example-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(30,144,255,.15); }
-.example-card.loading { opacity: .5; pointer-events: none; }
-.example-thumbs { display: flex; width: 120px; flex-shrink: 0; background: var(--panel); }
-.example-thumbs img { width: 100%; height: 100%; object-fit: cover; }
-.example-body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; }
-.example-prompt { font-size: 11px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.example-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(30,144,255,.15)}
+.example-card.loading{opacity:.5;pointer-events:none}
+.example-thumb-wrap{width:96px;flex-shrink:0;background:var(--panel);overflow:hidden;display:flex}
+.example-thumb-wrap img{width:100%;height:100%;object-fit:cover}
+.example-thumb-placeholder{
+    width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+    background:var(--panel);color:var(--border2);font-size:10px;
+}
+.example-meta{padding:6px 10px 2px;display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.example-lora-badge{
+    display:inline-flex;padding:2px 7px;background:rgba(30,144,255,.1);border-radius:4px;
+    font-size:9px;font-weight:600;color:var(--accent2);font-family:'JetBrains Mono',monospace;
+    white-space:nowrap;border:1px solid rgba(30,144,255,.25);
+}
+.example-body{flex:1;display:flex;flex-direction:column;justify-content:center;min-width:0}
+.example-prompt-text{
+    padding:4px 10px 9px;font-size:11px;color:var(--muted);line-height:1.45;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
 
 /* ══ Status bar ══ */
 .statusbar{
@@ -464,10 +477,10 @@ body{
   <div class="menubar">
     <div class="menubar-logo">Q2</div>
     <div class="menubar-title">Qwen-Image-2.1 <span>/ PnP Studio</span></div>
-    <span class="menubar-badge">Plug & Play</span>
+    <span class="menubar-badge">DEMO</span>
     <div class="menubar-spacer"></div>
     <div class="menubar-status"><span class="dot" id="conn-dot"></span><span id="conn-text">connecting…</span></div>
-    <a href="https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP" target="_blank" rel="noopener" class="gh-btn">
+    <a href="https://github.com/QwenLM/Qwen-Image-2.1" target="_blank" rel="noopener" class="gh-btn">
       <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
       <span>GitHub</span>
     </a>
@@ -735,11 +748,6 @@ const btnUndoBbox = document.getElementById('btn-undo-bbox');
 const btnRedoBbox = document.getElementById('btn-redo-bbox');
 const btnClearBbox = document.getElementById('btn-clear-bbox');
 
-const tabEdit = document.getElementById('tab-edit');
-const tabExamples = document.getElementById('tab-examples');
-const pageEdit = document.getElementById('page-edit');
-const pageExamples = document.getElementById('page-examples');
-
 /* ── State ── */
 let images = [];
 let toastTimer = null;
@@ -780,16 +788,6 @@ function setStatus(text, cls) {
     sbStatus.textContent = text;
     sbStatus.className = 'sb-pill' + (cls ? ' ' + cls : '');
 }
-
-/* ── Tab Switching ── */
-tabEdit.addEventListener('click', () => {
-    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
-    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
-});
-tabExamples.addEventListener('click', () => {
-    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
-    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
-});
 
 /* ── View mode ── */
 function setViewMode(mode) {
@@ -1148,64 +1146,79 @@ try {
 }
 
 /* ── Examples Logic ── */
-async function loadConfig() {
-    try {
-        const response = await fetch('/api/config');
-        const cfg = await response.json();
-        const list = document.getElementById('examples-scroll');
-        list.innerHTML = '';
-        cfg.examples.forEach(ex => {
-            const card = document.createElement('div');
-            card.className = 'example-card';
-            const thumbsHtml = ex.thumbs.map(t => `<img src="${t}" alt="">`).join('');
-            card.innerHTML = `
-                <div class="example-thumbs">${thumbsHtml}</div>
-                <div class="example-body">
-                    <div class="example-prompt">${ex.prompt}</div>
-                </div>
-            `;
-            card.addEventListener('click', () => loadExample(ex.idx, card));
-            list.appendChild(card);
-        });
-    } catch (e) {
-        console.error('Failed to load config:', e);
-    }
+const tabEdit = document.getElementById('tab-edit');
+const tabExamples = document.getElementById('tab-examples');
+const pageEdit = document.getElementById('page-edit');
+const pageExamples = document.getElementById('page-examples');
+
+tabEdit.addEventListener('click', () => {
+    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
+    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
+});
+tabExamples.addEventListener('click', () => {
+    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
+    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
+});
+
+function renderExamples(cfg) {
+    const list = document.getElementById('examples-scroll');
+    list.innerHTML = '';
+    cfg.examples.forEach(ex => {
+        const card = document.createElement('div');
+        card.className = 'example-card';
+        const thumbs = ex.thumbs.map(t =>
+            t ? '<img src="' + t + '" alt="">' : '<div class="example-thumb-placeholder">Preview</div>'
+        ).join('');
+        const promptShort = ex.prompt.length > 90 ? ex.prompt.slice(0, 90) + '…' : ex.prompt;
+        card.innerHTML =
+            '<div class="example-thumb-wrap">' + thumbs + '</div>'
+            + '<div class="example-body">'
+            +   '<div class="example-meta">'
+            +     '<span class="example-lora-badge">' + ex.n_images + ' img' + (ex.n_images > 1 ? 's' : '') + '</span>'
+            +   '</div>'
+            +   '<div class="example-prompt-text"></div>'
+            + '</div>';
+        card.querySelector('.example-prompt-text').textContent = promptShort;
+        card.addEventListener('click', () => loadExample(card, ex.idx));
+        list.appendChild(card);
+    });
 }
 
-async function loadExample(idx, card) {
+async function loadExample(card, idx) {
     if (!client) { showToast('Backend not connected', 'error'); return; }
-    document.querySelectorAll('.example-card').forEach(c => c.classList.remove('loading'));
+    document.querySelectorAll('.example-card.loading').forEach(c => c.classList.remove('loading'));
     card.classList.add('loading');
     showToast('Loading example…', 'info');
     try {
         const result = await client.predict('/load_example', { idx: idx });
         const data = result.data[0];
-        if (data && data.status === 'ok') {
+        if (data && data.status === 'ok' && data.images.length > 0) {
             clearAll();
-            if (data.prompt) {
-                promptInput.value = data.prompt;
-                charCount.textContent = promptInput.value.length;
-            }
-            if (data.images && data.images.length > 0) {
-                data.images.forEach((b64, i) => {
-                    const name = (data.names && data.names[i]) ? data.names[i] : ('example_' + (i + 1) + '.jpg');
-                    addImage(b64, name);
-                });
-            }
+            if (data.prompt) { promptInput.value = data.prompt; updateCharCount(); }
+            data.images.forEach((b64, i) => {
+                const name = (data.names && data.names[i]) ? data.names[i] : ('example_' + (i + 1) + '.jpg');
+                addImage(b64, name);
+            });
             tabEdit.click();
+            setViewMode('input');
             showToast('Example loaded', 'info');
         } else {
-            showToast('Could not load example', 'error');
+            showToast('Could not load example images', 'error');
         }
     } catch (e) {
         console.error('Example load error:', e);
-        showToast('Could not load example', 'error');
+        showToast('Could not load example images', 'error');
     } finally {
         card.classList.remove('loading');
     }
 }
 
-loadConfig();
+try {
+    const cfg = await fetch('api/config').then(r => r.json());
+    renderExamples(cfg);
+} catch (e) {
+    console.error('Failed to load config:', e);
+}
 
 /* ── Run ── */
 function validateBeforeRun() {
