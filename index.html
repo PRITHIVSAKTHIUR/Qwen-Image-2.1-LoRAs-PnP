@@ -748,6 +748,11 @@ const btnUndoBbox = document.getElementById('btn-undo-bbox');
 const btnRedoBbox = document.getElementById('btn-redo-bbox');
 const btnClearBbox = document.getElementById('btn-clear-bbox');
 
+const tabEdit = document.getElementById('tab-edit');
+const tabExamples = document.getElementById('tab-examples');
+const pageEdit = document.getElementById('page-edit');
+const pageExamples = document.getElementById('page-examples');
+
 /* ── State ── */
 let images = [];
 let toastTimer = null;
@@ -1145,81 +1150,6 @@ try {
     showToast('Could not connect to the backend API', 'error');
 }
 
-/* ── Examples Logic ── */
-const tabEdit = document.getElementById('tab-edit');
-const tabExamples = document.getElementById('tab-examples');
-const pageEdit = document.getElementById('page-edit');
-const pageExamples = document.getElementById('page-examples');
-
-tabEdit.addEventListener('click', () => {
-    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
-    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
-});
-tabExamples.addEventListener('click', () => {
-    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
-    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
-});
-
-function renderExamples(cfg) {
-    const list = document.getElementById('examples-scroll');
-    list.innerHTML = '';
-    cfg.examples.forEach(ex => {
-        const card = document.createElement('div');
-        card.className = 'example-card';
-        const thumbs = ex.thumbs.map(t =>
-            t ? '<img src="' + t + '" alt="">' : '<div class="example-thumb-placeholder">Preview</div>'
-        ).join('');
-        const promptShort = ex.prompt.length > 90 ? ex.prompt.slice(0, 90) + '…' : ex.prompt;
-        card.innerHTML =
-            '<div class="example-thumb-wrap">' + thumbs + '</div>'
-            + '<div class="example-body">'
-            +   '<div class="example-meta">'
-            +     '<span class="example-lora-badge">' + ex.n_images + ' img' + (ex.n_images > 1 ? 's' : '') + '</span>'
-            +   '</div>'
-            +   '<div class="example-prompt-text"></div>'
-            + '</div>';
-        card.querySelector('.example-prompt-text').textContent = promptShort;
-        card.addEventListener('click', () => loadExample(card, ex.idx));
-        list.appendChild(card);
-    });
-}
-
-async function loadExample(card, idx) {
-    if (!client) { showToast('Backend not connected', 'error'); return; }
-    document.querySelectorAll('.example-card.loading').forEach(c => c.classList.remove('loading'));
-    card.classList.add('loading');
-    showToast('Loading example…', 'info');
-    try {
-        const result = await client.predict('/load_example', { idx: idx });
-        const data = result.data[0];
-        if (data && data.status === 'ok' && data.images.length > 0) {
-            clearAll();
-            if (data.prompt) { promptInput.value = data.prompt; updateCharCount(); }
-            data.images.forEach((b64, i) => {
-                const name = (data.names && data.names[i]) ? data.names[i] : ('example_' + (i + 1) + '.jpg');
-                addImage(b64, name);
-            });
-            tabEdit.click();
-            setViewMode('input');
-            showToast('Example loaded', 'info');
-        } else {
-            showToast('Could not load example images', 'error');
-        }
-    } catch (e) {
-        console.error('Example load error:', e);
-        showToast('Could not load example images', 'error');
-    } finally {
-        card.classList.remove('loading');
-    }
-}
-
-try {
-    const cfg = await fetch('api/config').then(r => r.json());
-    renderExamples(cfg);
-} catch (e) {
-    console.error('Failed to load config:', e);
-}
-
 /* ── Run ── */
 function validateBeforeRun() {
     const promptVal = promptInput.value.trim();
@@ -1350,6 +1280,73 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+/* ── Examples Tab Logic ── */
+tabEdit.addEventListener('click', () => {
+    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
+    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
+});
+tabExamples.addEventListener('click', () => {
+    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
+    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
+});
+
+async function loadExample(card, idx) {
+    if (!client) { showToast('Backend not connected', 'error'); return; }
+    document.querySelectorAll('.example-card.loading').forEach(c => c.classList.remove('loading'));
+    card.classList.add('loading');
+    showToast('Loading example…', 'info');
+    try {
+        const result = await client.predict('/load_example', { idx: idx });
+        const data = result.data[0];
+        if (data && data.status === 'ok' && data.images && data.images.length > 0) {
+            clearAll();
+            if (data.prompt) { promptInput.value = data.prompt; charCount.textContent = data.prompt.length; }
+            data.images.forEach((b64, i) => {
+                const name = (data.names && data.names[i]) ? data.names[i] : ('example_' + (i + 1) + '.jpg');
+                addImage(b64, name);
+            });
+            tabEdit.click();
+            setViewMode('input');
+            showToast('Example loaded', 'info');
+        } else {
+            showToast('Could not load example images', 'error');
+        }
+    } catch (e) {
+        console.error('Example load error:', e);
+        showToast('Could not load example images', 'error');
+    } finally {
+        card.classList.remove('loading');
+    }
+}
+
+async function initExamples() {
+    try {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        const list = document.getElementById('examples-scroll');
+        list.innerHTML = '';
+        cfg.examples.forEach(ex => {
+            const card = document.createElement('div');
+            card.className = 'example-card';
+            const thumbs = ex.thumbs.map(t =>
+                t ? '<img src="' + t + '" alt="">' : '<div class="example-thumb-placeholder">Preview</div>'
+            ).join('');
+            const promptShort = ex.prompt.length > 90 ? ex.prompt.slice(0, 90) + '…' : ex.prompt;
+            card.innerHTML =
+                '<div class="example-thumb-wrap">' + thumbs + '</div>'
+                + '<div class="example-body">'
+                +   '<div class="example-meta"><span class="example-lora-badge">' + ex.n_images + ' img' + (ex.n_images > 1 ? 's' : '') + '</span></div>'
+                +   '<div class="example-prompt-text"></div>'
+                + '</div>';
+            card.querySelector('.example-prompt-text').textContent = promptShort;
+            card.addEventListener('click', () => loadExample(card, ex.idx));
+            list.appendChild(card);
+        });
+    } catch (e) {
+        console.error('Failed to load config for examples:', e);
+    }
+}
+
+initExamples();
 renderFilmstrip();
 updateCounts();
 renderCanvas();
