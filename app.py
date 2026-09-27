@@ -15,48 +15,11 @@ from gradio import Server
 from fastapi.responses import HTMLResponse
 from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 
-# --- LoRA config compatibility shim -----------------------------------------
-# Some LoRA checkpoints (e.g. PrunaAI/Pruna-Qwen-Image-2.1) ship PEFT
-# LoraConfig metadata with extra keys (e.g. `monteclora_config`) that a newer
-# peft version understands but the installed peft/diffusers in this
-# environment does not. diffusers calls `LoraConfig(**lora_config_kwargs)`
-# verbatim (see diffusers/utils/peft_utils.py::_create_lora_config) and
-# raises TypeError on any unknown kwarg. We wrap LoraConfig so unsupported
-# kwargs are silently dropped instead of crashing the load. Such adapters
-# then load as plain LoRAs; any Pruna-specific MonteCLoRA behavior tied to
-# the dropped keys is not reproduced, but the adapter loads and runs.
-import inspect
-from peft import LoraConfig as _RealLoraConfig
-import diffusers.utils.peft_utils as _diffusers_peft_utils
-
-_VALID_LORA_CONFIG_KEYS = set(inspect.signature(_RealLoraConfig.__init__).parameters.keys())
-
-class _CompatLoraConfig(_RealLoraConfig):
-    def __init__(self, **kwargs):
-        dropped = sorted(k for k in kwargs if k not in _VALID_LORA_CONFIG_KEYS)
-        if dropped:
-            print(f"[lora-compat] Dropping unsupported LoraConfig kwargs: {dropped}", flush=True)
-        super().__init__(**{k: v for k, v in kwargs.items() if k in _VALID_LORA_CONFIG_KEYS})
-
-_diffusers_peft_utils.LoraConfig = _CompatLoraConfig
-# -----------------------------------------------------------------------------
-
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
 TURBO_REPO = os.environ.get("TURBO_REPO", "Viggle/Qwen-Image-2.1-viggle-turbo")
 TURBO_LORA_FILE = "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
 TURBO_ADAPTER_NAME = "turbo"
 TURBO_STEPS = 4
-
-PRUNA5_REPO = "PrunaAI/Pruna-Qwen-Image-2.1"
-PRUNA5_LORA_FILE = "p_qwen_image_2.1_5step_v0.1.safetensors"
-PRUNA5_ADAPTER_NAME = "pruna5"
-PRUNA5_STEPS = 5
-
-PRUNA8_REPO = "PrunaAI/Pruna-Qwen-Image-2.1"
-PRUNA8_LORA_FILE = "p_qwen_image_2.1_8step_v0.1.safetensors"
-PRUNA8_ADAPTER_NAME = "pruna8"
-PRUNA8_STEPS = 8
-
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 OBJECT_MOVER_REPO = "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview"
@@ -80,24 +43,16 @@ MAX_REF_IMAGES = 10
 
 DEFAULT_MODE = "None (no LoRA)"
 TURBO_MODE = "4-Step Turbo (Viggle)"
-PRUNA5_MODE = "5-Step Turbo (Pruna)"
-PRUNA8_MODE = "8-Step Turbo (Pruna)"
 OBJECT_MOVER_MODE = "Object Mover (prithivMLmods)"
 OBJECT_REMOVER_MODE = "Object Remover (prithivMLmods)"
 NATURAL_EXPOSURE_MODE = "Natural Exposure (prithivMLmods)"
 FACE_SWAP_ALISSON_MODE = "Face Swap (Alissonerdx)"
 CUSTOM_MODE = "Custom LoRA (enter repo below)"
 
-MODE_CHOICES = [
-    DEFAULT_MODE, TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE,
-    OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE,
-    FACE_SWAP_ALISSON_MODE, CUSTOM_MODE
-]
+MODE_CHOICES = [DEFAULT_MODE, TURBO_MODE, OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, FACE_SWAP_ALISSON_MODE, CUSTOM_MODE]
 
 LORA_PRESETS = {
     TURBO_MODE: (TURBO_REPO, TURBO_LORA_FILE, TURBO_ADAPTER_NAME),
-    PRUNA5_MODE: (PRUNA5_REPO, PRUNA5_LORA_FILE, PRUNA5_ADAPTER_NAME),
-    PRUNA8_MODE: (PRUNA8_REPO, PRUNA8_LORA_FILE, PRUNA8_ADAPTER_NAME),
     OBJECT_MOVER_MODE: (OBJECT_MOVER_REPO, OBJECT_MOVER_FILE, OBJECT_MOVER_ADAPTER),
     OBJECT_REMOVER_MODE: (OBJECT_REMOVER_REPO, OBJECT_REMOVER_FILE, OBJECT_REMOVER_ADAPTER),
     NATURAL_EXPOSURE_MODE: (NATURAL_EXPOSURE_REPO, NATURAL_EXPOSURE_FILE, NATURAL_EXPOSURE_ADAPTER),
@@ -124,65 +79,65 @@ LORA_EXPLORER_CONFIG = [
     {
         "title": "Anime Consistency",
         "repo": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
-        "weights": "Qwen2.1_Anime_consistency.safetensors",
-        "prompt": "Transform into anime.",
+        "weight": "Qwen2.1_Anime_consistency.safetensors",
         "images": ["examples/anime_input.jpg"],
+        "prompt": "Transform into anime.",
         "cover": "LoRA_Cover/anime_cover.png"
     },
     {
         "title": "Natural Exposure",
         "repo": "prithivMLmods/Qwen-Image-2.1-Natural-Exposure-LoRA",
-        "weights": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
-        "prompt": "Transform the image with balanced neutral exposure",
+        "weight": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
         "images": ["examples/exposure_input.jpg"],
+        "prompt": "Transform the image with balanced neutral exposure",
         "cover": "LoRA_Cover/exposure_cover.png"
     },
     {
         "title": "Object Mover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview",
-        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
-        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
+        "weight": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
         "images": ["examples/objmv_input.jpg"],
+        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
         "cover": "LoRA_Cover/objmv_cover.jpg"
     },
     {
         "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
-        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
-        "prompt": "Remove the red highlighted object from the scene.",
+        "weight": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
         "images": ["examples/objrmT_input.jpg"],
+        "prompt": "Remove the red highlighted object from the scene.",
         "cover": "LoRA_Cover/objrmT_cover.jpg"
     },
     {
         "title": "Object Remover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-Preview",
-        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
-        "prompt": "Remove the red highlighted object from the scene.",
+        "weight": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
         "images": ["examples/objrm_input.jpg"],
+        "prompt": "Remove the red highlighted object from the scene.",
         "cover": "LoRA_Cover/objrm_cover.jpg"
     },
     {
         "title": "Object Mover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-turbo",
-        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
-        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
+        "weight": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
         "images": ["examples/objmvT_input.jpg"],
+        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
         "cover": "LoRA_Cover/objmvT_cover.jpg"
     },
     {
-        "title": "Outpaint",
+        "title": "Outpaint LoRA",
         "repo": "ausboss/Qwen-Image-2.1-Outpaint-LoRA",
-        "weights": "qwen-image-2.1-outpaint-v2.safetensors",
-        "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
+        "weight": "qwen-image-2.1-outpaint-v2.safetensors",
         "images": ["examples/outpaint_input.jpg"],
+        "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
         "cover": "LoRA_Cover/outpaint_cover.jpg"
     },
     {
         "title": "Best Face Swap",
         "repo": "Alissonerdx/BFS-Best-Face-Swap",
-        "weights": "bfs_head_v1.1_qwen_2.1.safetensors",
-        "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k",
+        "weight": "bfs_head_v1.1_qwen_2.1.safetensors",
         "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
+        "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k",
         "cover": "LoRA_Cover/faceswap_cover.png"
     }
 ]
@@ -385,14 +340,9 @@ def generate(
     if not prompt:
         raise gr.Error("Enter a prompt.")
 
-    turbo = mode in [TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE]
+    turbo = mode == TURBO_MODE
     if turbo:
-        if mode == TURBO_MODE:
-            num_inference_steps = TURBO_STEPS
-        elif mode == PRUNA5_MODE:
-            num_inference_steps = PRUNA5_STEPS
-        elif mode == PRUNA8_MODE:
-            num_inference_steps = PRUNA8_STEPS
+        num_inference_steps = TURBO_STEPS
         guidance_scale = 1.0
         negative_prompt = ""
 
@@ -478,22 +428,22 @@ def infer(
         prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
         guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
     )
-
+    
     return {
         "image": pil_to_b64_png(image),
         "info": info,
         "seed": used_seed
     }
 
-@app.api(name="load_explorer_item", queue=False)
-def load_explorer_item(idx: float) -> dict:
-    """Return base64-encoded input images + prompt + LoRA details for a given explorer item."""
+@app.api(name="load_example", queue=False)
+def load_example(idx: float) -> dict:
+    """Return base64-encoded explorer images + prompt + repo details for a given card index."""
     try:
         i = int(idx)
     except (ValueError, TypeError):
         i = -1
     if i < 0 or i >= len(LORA_EXPLORER_CONFIG):
-        return {"images": [], "prompt": "", "repo": "", "weights": "", "names": [], "status": "error"}
+        return {"images": [], "prompt": "", "names": [], "repo": "", "weight": "", "status": "error"}
     ex = LORA_EXPLORER_CONFIG[i]
     b64_list, names = [], []
     for path in ex["images"]:
@@ -502,25 +452,26 @@ def load_explorer_item(idx: float) -> dict:
             b64_list.append(b64)
             names.append(os.path.basename(path))
     return {
-        "images": b64_list,
-        "prompt": ex["prompt"],
+        "images": b64_list, 
+        "prompt": ex["prompt"], 
+        "names": names, 
         "repo": ex["repo"],
-        "weights": ex["weights"],
-        "names": names,
+        "weight": ex["weight"],
         "status": "ok"
     }
 
 @app.get("/api/config")
 def client_config():
-    explorer_payload = []
+    examples_payload = []
     for i, ex in enumerate(LORA_EXPLORER_CONFIG):
-        explorer_payload.append({
+        examples_payload.append({
             "idx": i,
             "title": ex["title"],
-            "repo": ex["repo"],
-            "cover_b64": make_thumb_b64(ex["cover"])
+            "cover": make_thumb_b64(ex["cover"]),
+            "prompt": ex["prompt"],
+            "n_images": len(ex["images"])
         })
-    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "lora_explorer": explorer_payload}
+    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "examples": examples_payload}
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
