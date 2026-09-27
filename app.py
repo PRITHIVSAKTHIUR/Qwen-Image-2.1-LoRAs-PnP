@@ -75,63 +75,71 @@ ASPECTS = ["auto (reference or 1:1)", "1:1", "4:3", "3:4", "3:2", "2:3", "16:9",
 RGBA_PREFIX = "This is an RGBA image with transparency. "
 RGBA_SUFFIX = " The image has alpha channel and the background is transparent."
 
-# LoRA Explorer Config
-EXPLORER_CONFIG = [
+# ── LoRA Explorer Config ──────────────────────────────────────────────────────
+LORA_EXPLORER_CONFIG = [
     {
+        "title": "Anime Consistency",
         "repo": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
-        "weight": "Qwen2.1_Anime_consistency.safetensors",
+        "weights": "Qwen2.1_Anime_consistency.safetensors",
+        "cover": "LoRA_Cover/anime_cover.png",
         "images": ["examples/anime_input.jpg"],
-        "prompt": "Transform into anime.",
-        "cover": "LoRA_Cover/anime_cover.png"
+        "prompt": "Transform into anime."
     },
     {
+        "title": "Natural Exposure",
         "repo": "prithivMLmods/Qwen-Image-2.1-Natural-Exposure-LoRA",
-        "weight": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
+        "weights": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
+        "cover": "LoRA_Cover/exposure_cover.png",
         "images": ["examples/exposure_input.jpg"],
-        "prompt": "Transform the image with balanced neutral exposure",
-        "cover": "LoRA_Cover/exposure_cover.png"
+        "prompt": "Transform the image with balanced neutral exposure"
     },
     {
+        "title": "Object Mover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview",
-        "weight": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
+        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
+        "cover": "LoRA_Cover/objmv_cover.jpg",
         "images": ["examples/objmv_input.jpg"],
-        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
-        "cover": "LoRA_Cover/objmv_cover.jpg"
+        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene."
     },
     {
+        "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
-        "weight": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
+        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
+        "cover": "LoRA_Cover/objrmT_cover.jpg",
         "images": ["examples/objrmT_input.jpg"],
-        "prompt": "Remove the red highlighted object from the scene.",
-        "cover": "LoRA_Cover/objrmT_cover.jpg"
+        "prompt": "Remove the red highlighted object from the scene."
     },
     {
+        "title": "Object Remover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-Preview",
-        "weight": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
+        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
+        "cover": "LoRA_Cover/objrm_cover.jpg",
         "images": ["examples/objrm_input.jpg"],
-        "prompt": "Remove the red highlighted object from the scene.",
-        "cover": "LoRA_Cover/objrm_cover.jpg"
+        "prompt": "Remove the red highlighted object from the scene."
     },
     {
+        "title": "Object Mover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-turbo",
-        "weight": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
+        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
+        "cover": "LoRA_Cover/objmvT_cover.jpg",
         "images": ["examples/objmvT_input.jpg"],
-        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
-        "cover": "LoRA_Cover/objmvT_cover.jpg"
+        "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene."
     },
     {
+        "title": "Outpaint v2",
         "repo": "ausboss/Qwen-Image-2.1-Outpaint-LoRA",
-        "weight": "qwen-image-2.1-outpaint-v2.safetensors",
+        "weights": "qwen-image-2.1-outpaint-v2.safetensors",
+        "cover": "LoRA_Cover/outpaint_cover.jpg",
         "images": ["examples/outpaint_input.jpg"],
-        "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
-        "cover": "LoRA_Cover/outpaint_cover.jpg"
+        "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged."
     },
     {
+        "title": "Best Face Swap",
         "repo": "Alissonerdx/BFS-Best-Face-Swap",
-        "weight": "bfs_head_v1.1_qwen_2.1.safetensors",
+        "weights": "bfs_head_v1.1_qwen_2.1.safetensors",
+        "cover": "LoRA_Cover/faceswap_cover.png",
         "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
-        "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k",
-        "cover": "LoRA_Cover/faceswap_cover.png"
+        "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k"
     }
 ]
 
@@ -301,14 +309,14 @@ def pil_to_b64_png(image: Image.Image) -> str:
     image.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
-def make_thumb_b64(path, max_dim=400):
+def make_thumb_b64(path, max_dim=220):
     if not os.path.exists(path):
         return ""
     try:
         img = Image.open(path).convert("RGB")
         img.thumbnail((max_dim, max_dim), Image.LANCZOS)
         buf = BytesIO()
-        img.save(buf, format="JPEG", quality=80)
+        img.save(buf, format="JPEG", quality=65)
         return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
     except Exception:
         return ""
@@ -430,14 +438,14 @@ def infer(
 
 @app.api(name="load_example", queue=False)
 def load_example(idx: float) -> dict:
-    """Return base64-encoded example images + prompt + LoRA details for a given example index."""
+    """Return base64-encoded example images + prompt + LoRA config for a given index."""
     try:
         i = int(idx)
     except (ValueError, TypeError):
         i = -1
-    if i < 0 or i >= len(EXPLORER_CONFIG):
-        return {"images": [], "prompt": "", "names": [], "repo": "", "weight": "", "status": "error"}
-    ex = EXPLORER_CONFIG[i]
+    if i < 0 or i >= len(LORA_EXPLORER_CONFIG):
+        return {"images": [], "prompt": "", "repo": "", "weights": "", "status": "error"}
+    ex = LORA_EXPLORER_CONFIG[i]
     b64_list, names = [], []
     for path in ex["images"]:
         b64 = encode_full_image(path)
@@ -445,27 +453,27 @@ def load_example(idx: float) -> dict:
             b64_list.append(b64)
             names.append(os.path.basename(path))
     return {
-        "images": b64_list, 
-        "prompt": ex["prompt"], 
-        "names": names, 
+        "images": b64_list,
+        "prompt": ex["prompt"],
         "repo": ex["repo"],
-        "weight": ex["weight"],
-        "status": "ok" if b64_list else "error"
+        "weights": ex["weights"],
+        "names": names,
+        "status": "ok"
     }
 
 @app.get("/api/config")
 def client_config():
-    examples_payload = []
-    for i, ex in enumerate(EXPLORER_CONFIG):
-        examples_payload.append({
+    explorer_payload = []
+    for i, ex in enumerate(LORA_EXPLORER_CONFIG):
+        explorer_payload.append({
             "idx": i,
-            "cover": make_thumb_b64(ex["cover"]),
-            "repo": ex["repo"],
-            "weight": ex["weight"],
+            "title": ex["title"],
+            "cover": encode_full_image(ex["cover"]),
             "prompt": ex["prompt"],
-            "n_images": len(ex["images"])
+            "repo": ex["repo"],
+            "weights": ex["weights"]
         })
-    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "examples": examples_payload}
+    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "explorer": explorer_payload}
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
