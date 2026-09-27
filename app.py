@@ -75,9 +75,9 @@ ASPECTS = ["auto (reference or 1:1)", "1:1", "4:3", "3:4", "3:2", "2:3", "16:9",
 RGBA_PREFIX = "This is an RGBA image with transparency. "
 RGBA_SUFFIX = " The image has alpha channel and the background is transparent."
 
-LORA_EXPLORER_CONFIG = [
+# LoRA Explorer Config
+EXPLORER_CONFIG = [
     {
-        "title": "Anime Consistency",
         "repo": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
         "weight": "Qwen2.1_Anime_consistency.safetensors",
         "images": ["examples/anime_input.jpg"],
@@ -85,7 +85,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/anime_cover.png"
     },
     {
-        "title": "Natural Exposure",
         "repo": "prithivMLmods/Qwen-Image-2.1-Natural-Exposure-LoRA",
         "weight": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
         "images": ["examples/exposure_input.jpg"],
@@ -93,7 +92,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/exposure_cover.png"
     },
     {
-        "title": "Object Mover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview",
         "weight": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
         "images": ["examples/objmv_input.jpg"],
@@ -101,7 +99,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/objmv_cover.jpg"
     },
     {
-        "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
         "weight": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
         "images": ["examples/objrmT_input.jpg"],
@@ -109,7 +106,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/objrmT_cover.jpg"
     },
     {
-        "title": "Object Remover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-Preview",
         "weight": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
         "images": ["examples/objrm_input.jpg"],
@@ -117,7 +113,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/objrm_cover.jpg"
     },
     {
-        "title": "Object Mover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-turbo",
         "weight": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
         "images": ["examples/objmvT_input.jpg"],
@@ -125,7 +120,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/objmvT_cover.jpg"
     },
     {
-        "title": "Outpaint LoRA",
         "repo": "ausboss/Qwen-Image-2.1-Outpaint-LoRA",
         "weight": "qwen-image-2.1-outpaint-v2.safetensors",
         "images": ["examples/outpaint_input.jpg"],
@@ -133,7 +127,6 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/outpaint_cover.jpg"
     },
     {
-        "title": "Best Face Swap",
         "repo": "Alissonerdx/BFS-Best-Face-Swap",
         "weight": "bfs_head_v1.1_qwen_2.1.safetensors",
         "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
@@ -437,14 +430,14 @@ def infer(
 
 @app.api(name="load_example", queue=False)
 def load_example(idx: float) -> dict:
-    """Return base64-encoded explorer images + prompt + repo details for a given card index."""
+    """Return base64-encoded example images + prompt + LoRA details for a given example index."""
     try:
         i = int(idx)
     except (ValueError, TypeError):
         i = -1
-    if i < 0 or i >= len(LORA_EXPLORER_CONFIG):
+    if i < 0 or i >= len(EXPLORER_CONFIG):
         return {"images": [], "prompt": "", "names": [], "repo": "", "weight": "", "status": "error"}
-    ex = LORA_EXPLORER_CONFIG[i]
+    ex = EXPLORER_CONFIG[i]
     b64_list, names = [], []
     for path in ex["images"]:
         b64 = encode_full_image(path)
@@ -457,17 +450,18 @@ def load_example(idx: float) -> dict:
         "names": names, 
         "repo": ex["repo"],
         "weight": ex["weight"],
-        "status": "ok"
+        "status": "ok" if b64_list else "error"
     }
 
 @app.get("/api/config")
 def client_config():
     examples_payload = []
-    for i, ex in enumerate(LORA_EXPLORER_CONFIG):
+    for i, ex in enumerate(EXPLORER_CONFIG):
         examples_payload.append({
             "idx": i,
-            "title": ex["title"],
             "cover": make_thumb_b64(ex["cover"]),
+            "repo": ex["repo"],
+            "weight": ex["weight"],
             "prompt": ex["prompt"],
             "n_images": len(ex["images"])
         })
