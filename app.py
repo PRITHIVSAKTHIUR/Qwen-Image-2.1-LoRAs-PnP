@@ -15,6 +15,32 @@ from gradio import Server
 from fastapi.responses import HTMLResponse
 from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 
+# --- LoRA config compatibility shim -----------------------------------------
+# Some LoRA checkpoints (e.g. PrunaAI/Pruna-Qwen-Image-2.1) ship PEFT
+# LoraConfig metadata with extra keys (e.g. `monteclora_config`) that a newer
+# peft version understands but the installed peft/diffusers in this
+# environment does not. diffusers calls `LoraConfig(**lora_config_kwargs)`
+# verbatim (see diffusers/utils/peft_utils.py::_create_lora_config) and
+# raises TypeError on any unknown kwarg. We wrap LoraConfig so unsupported
+# kwargs are silently dropped instead of crashing the load. Such adapters
+# then load as plain LoRAs; any Pruna-specific MonteCLoRA behavior tied to
+# the dropped keys is not reproduced, but the adapter loads and runs.
+import inspect
+from peft import LoraConfig as _RealLoraConfig
+import diffusers.utils.peft_utils as _diffusers_peft_utils
+
+_VALID_LORA_CONFIG_KEYS = set(inspect.signature(_RealLoraConfig.__init__).parameters.keys())
+
+class _CompatLoraConfig(_RealLoraConfig):
+    def __init__(self, **kwargs):
+        dropped = sorted(k for k in kwargs if k not in _VALID_LORA_CONFIG_KEYS)
+        if dropped:
+            print(f"[lora-compat] Dropping unsupported LoraConfig kwargs: {dropped}", flush=True)
+        super().__init__(**{k: v for k, v in kwargs.items() if k in _VALID_LORA_CONFIG_KEYS})
+
+_diffusers_peft_utils.LoraConfig = _CompatLoraConfig
+# -----------------------------------------------------------------------------
+
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
 TURBO_REPO = os.environ.get("TURBO_REPO", "Viggle/Qwen-Image-2.1-viggle-turbo")
 TURBO_LORA_FILE = "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
@@ -63,8 +89,8 @@ FACE_SWAP_ALISSON_MODE = "Face Swap (Alissonerdx)"
 CUSTOM_MODE = "Custom LoRA (enter repo below)"
 
 MODE_CHOICES = [
-    DEFAULT_MODE, TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE, 
-    OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, 
+    DEFAULT_MODE, TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE,
+    OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE,
     FACE_SWAP_ALISSON_MODE, CUSTOM_MODE
 ]
 
@@ -149,7 +175,7 @@ LORA_EXPLORER_CONFIG = [
         "weights": "qwen-image-2.1-outpaint-v2.safetensors",
         "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
         "images": ["examples/outpaint_input.jpg"],
-        "cover": "LoRA_Cover/outpaint_cover.jpg" 
+        "cover": "LoRA_Cover/outpaint_cover.jpg"
     },
     {
         "title": "Best Face Swap",
@@ -452,7 +478,7 @@ def infer(
         prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
         guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
     )
-    
+
     return {
         "image": pil_to_b64_png(image),
         "info": info,
@@ -476,11 +502,11 @@ def load_explorer_item(idx: float) -> dict:
             b64_list.append(b64)
             names.append(os.path.basename(path))
     return {
-        "images": b64_list, 
-        "prompt": ex["prompt"], 
-        "repo": ex["repo"], 
-        "weights": ex["weights"], 
-        "names": names, 
+        "images": b64_list,
+        "prompt": ex["prompt"],
+        "repo": ex["repo"],
+        "weights": ex["weights"],
+        "names": names,
         "status": "ok"
     }
 
