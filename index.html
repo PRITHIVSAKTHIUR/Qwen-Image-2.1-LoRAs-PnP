@@ -364,6 +364,61 @@ body{
     font-size: 10px; color: var(--faint); margin-top: -4px; margin-bottom: 12px; 
     font-family: 'Inter', sans-serif; line-height: 1.4;
 }
+.pnp-note {
+    font-size: 11px; color: var(--accent3); margin-top: 4px; margin-bottom: 12px; 
+    font-family: 'Inter', sans-serif; font-style: italic;
+}
+
+/* LoRA Explorer Grid */
+.lora-explorer-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 14px;
+}
+.lora-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.lora-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(30, 144, 255, .15);
+    transform: translateY(-2px);
+}
+.lora-card.loading { opacity: 0.5; pointer-events: none; }
+.lora-cover {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: #000;
+}
+.lora-info {
+    padding: 10px;
+}
+.lora-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lora-prompt {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
 
 /* ══ Status bar ══ */
 .statusbar{
@@ -436,6 +491,7 @@ body{
     .modern-textarea{font-size:16px} .btn-run{padding:14px 24px;font-size:15px}
     .statusbar{flex-wrap:wrap;height:auto;min-height:var(--statusbar-h);padding:4px 10px;gap:2px}
     .sb-link{display:none} .toast-notification{max-width:calc(100vw - 32px);font-size:12px;padding:10px 16px}
+    .lora-explorer-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -542,6 +598,7 @@ body{
   <div class="inspector">
     <div class="inspector-tabs">
       <button class="insp-tab active" id="tab-edit">Generate</button>
+      <button class="insp-tab" id="tab-explorer">LoRA Explorer</button>
     </div>
 
     <!-- Edit page -->
@@ -560,11 +617,15 @@ body{
             <option value="Object Mover (prithivMLmods)">Object Mover (prithivMLmods)</option>
             <option value="Object Remover (prithivMLmods)">Object Remover (prithivMLmods)</option>
             <option value="Natural Exposure (prithivMLmods)">Natural Exposure (prithivMLmods)</option>
+            <option value="Face Swap (Alissonerdx)">Face Swap (Alissonerdx)</option>
             <option value="Custom LoRA (enter repo below)">Custom LoRA (enter repo below)</option>
         </select>
         <div class="custom-lora-group" id="custom-lora-group">
             <input type="text" id="custom-lora-repo" class="custom-lora-input" placeholder="Custom LoRA repo id (e.g. user/repo)">
             <input type="text" id="custom-lora-weight" class="custom-lora-input" placeholder="Weight file name (optional)">
+        </div>
+        <div class="pnp-note">
+            *Choose the Custom LoRA for Plug and Play (any LoRA based on Qwen Image 2.1)
         </div>
         <select id="custom-tier" class="lora-native-select">
             <option value="1K (fast)">1K (fast)</option>
@@ -632,6 +693,11 @@ body{
         <div class="insp-section-title"><span>Run Info</span></div>
         <textarea id="custom-info" class="modern-textarea" rows="4" readonly placeholder="Run info will appear here..."></textarea>
       </div>
+    </div>
+
+    <!-- LoRA Explorer page -->
+    <div class="insp-page" id="page-explorer">
+      <div class="lora-explorer-grid" id="lora-explorer-grid"></div>
     </div>
   </div>
 
@@ -707,6 +773,11 @@ const btnUndoBbox = document.getElementById('btn-undo-bbox');
 const btnRedoBbox = document.getElementById('btn-redo-bbox');
 const btnClearBbox = document.getElementById('btn-clear-bbox');
 
+const tabEdit = document.getElementById('tab-edit');
+const tabExplorer = document.getElementById('tab-explorer');
+const pageEdit = document.getElementById('page-edit');
+const pageExplorer = document.getElementById('page-explorer');
+
 /* ── State ── */
 let images = [];
 let toastTimer = null;
@@ -771,11 +842,9 @@ function renderCanvas() {
             bboxCanvas.width = mainImage.naturalWidth;
             bboxCanvas.height = mainImage.naturalHeight;
             
-            // Only draw bounding boxes if in INPUT view
             if (showInput) {
                 drawBboxes();
             } else {
-                // Clear any existing boxes from the canvas if in RESULT view
                 bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
             }
         };
@@ -783,9 +852,8 @@ function renderCanvas() {
         if (showResult) {
             mainImage.src = currentResult.b64;
             canvasMeta.textContent = 'result · seed ' + currentResult.seed;
-            bboxCanvas.style.display = 'none'; // Hide overlay completely in Result view
+            bboxCanvas.style.display = 'none'; 
             
-            // Turn off bbox drawing tool if switching to result view
             if (currentTool === 'bbox') {
                 currentTool = 'none';
                 btnBbox.classList.remove('active');
@@ -795,7 +863,7 @@ function renderCanvas() {
         } else {
             mainImage.src = images[0].b64;
             canvasMeta.textContent = 'input #1 · ' + (images[0].name || 'image');
-            bboxCanvas.style.display = 'block'; // Show overlay in Input view
+            bboxCanvas.style.display = 'block';
         }
     } else {
         boardWrapper.style.display = 'none';
@@ -1128,7 +1196,6 @@ async function runEdit() {
 
     let payloadImages = [...images];
     
-    // Composite bboxes onto the first image if they exist
     if (payloadImages.length > 0 && bboxes.length > 0) {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = bboxCanvas.width;
@@ -1234,6 +1301,81 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+/* ── Explorer Tab Logic ── */
+tabEdit.addEventListener('click', () => {
+    tabEdit.classList.add('active'); tabExplorer.classList.remove('active');
+    pageEdit.classList.add('active'); pageExplorer.classList.remove('active');
+});
+tabExplorer.addEventListener('click', () => {
+    tabExplorer.classList.add('active'); tabEdit.classList.remove('active');
+    pageExplorer.classList.add('active'); pageEdit.classList.remove('active');
+});
+
+async function loadExplorerCard(card, idx) {
+    if (!client) { showToast('Backend not connected', 'error'); return; }
+    document.querySelectorAll('.lora-card.loading').forEach(c => c.classList.remove('loading'));
+    card.classList.add('loading');
+    showToast('Loading LoRA & Assets…', 'info');
+    try {
+        const result = await client.predict('/load_example', { idx: idx });
+        const data = result.data[0];
+        if (data && data.status === 'ok' && data.images && data.images.length > 0) {
+            clearAll();
+            
+            // Set to custom LoRA
+            loraSelect.value = "Custom LoRA (enter repo below)";
+            loraSelect.dispatchEvent(new Event('change'));
+            customRepoInput.value = data.repo;
+            customWeightInput.value = data.weights;
+            
+            if (data.prompt) { promptInput.value = data.prompt; charCount.textContent = data.prompt.length; }
+            
+            data.images.forEach((b64, i) => {
+                const name = (data.names && data.names[i]) ? data.names[i] : ('explorer_' + (i + 1) + '.jpg');
+                addImage(b64, name);
+            });
+            
+            tabEdit.click();
+            setViewMode('input');
+            showToast('LoRA loaded successfully', 'info');
+        } else {
+            showToast('Could not load LoRA assets', 'error');
+        }
+    } catch (e) {
+        console.error('Explorer load error:', e);
+        showToast('Could not load LoRA assets', 'error');
+    } finally {
+        card.classList.remove('loading');
+    }
+}
+
+async function initExplorer() {
+    try {
+        const cfg = await fetch('/api/config').then(r => r.json());
+        const list = document.getElementById('lora-explorer-grid');
+        list.innerHTML = '';
+        
+        cfg.explorer.forEach(lora => {
+            const card = document.createElement('div');
+            card.className = 'lora-card';
+            const coverHtml = lora.cover ? `<img src="${lora.cover}" class="lora-cover" alt="${lora.title}">` : '<div class="lora-cover" style="display:flex;align-items:center;justify-content:center;color:var(--faint);">Preview</div>';
+            const promptShort = lora.prompt.length > 60 ? lora.prompt.slice(0, 60) + '…' : lora.prompt;
+            card.innerHTML = `
+                ${coverHtml}
+                <div class="lora-info">
+                    <div class="lora-title">${lora.title}</div>
+                    <div class="lora-prompt">${promptShort}</div>
+                </div>
+            `;
+            card.addEventListener('click', () => loadExplorerCard(card, lora.idx));
+            list.appendChild(card);
+        });
+    } catch (e) {
+        console.error('Failed to initialize LoRA Explorer:', e);
+    }
+}
+
+initExplorer();
 renderFilmstrip();
 updateCounts();
 renderCanvas();
