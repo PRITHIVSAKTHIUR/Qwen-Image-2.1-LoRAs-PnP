@@ -369,57 +369,28 @@ body{
     font-family: 'Inter', sans-serif; font-style: italic;
 }
 
-/* LoRA Explorer Grid */
-.lora-explorer-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: 12px;
-    padding: 14px;
+/* Examples page */
+.examples-list{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.example-card{
+    background:var(--panel2);border:1px solid var(--border);
+    border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s ease;flex-shrink:0;
+    display:flex;flex-direction:column;
 }
-.lora-card {
-    background: var(--panel2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    flex-direction: column;
+.example-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(30,144,255,.15)}
+.example-card.loading{opacity:.5;pointer-events:none}
+.example-cover-wrap{width:100%;height:140px;background:var(--panel);overflow:hidden;border-bottom:1px solid var(--border);}
+.example-cover-wrap img{width:100%;height:100%;object-fit:cover}
+.example-body{padding:10px 12px}
+.example-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.example-prompt-text{
+    font-size:11px;color:var(--muted);line-height:1.4;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
 }
-.lora-card:hover {
-    border-color: var(--accent);
-    box-shadow: 0 4px 14px rgba(30,144,255,.15);
-    transform: translateY(-2px);
-}
-.lora-card.loading { opacity: 0.5; pointer-events: none; }
-.lora-card-cover {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    background: #000;
-    border-bottom: 1px solid var(--border);
-}
-.lora-card-body {
-    padding: 8px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-.lora-card-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.lora-card-repo {
-    font-size: 9px;
-    color: var(--dim);
-    font-family: 'JetBrains Mono', monospace;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.example-meta{padding:6px 12px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;border-top:1px solid var(--border);background:var(--panel)}
+.example-lora-badge{
+    display:inline-flex;padding:2px 7px;background:rgba(30,144,255,.1);border-radius:4px;
+    font-size:9px;font-weight:600;color:var(--accent2);font-family:'JetBrains Mono',monospace;
+    white-space:nowrap;border:1px solid rgba(30,144,255,.25);
 }
 
 /* ══ Status bar ══ */
@@ -599,7 +570,7 @@ body{
   <div class="inspector">
     <div class="inspector-tabs">
       <button class="insp-tab active" id="tab-edit">Generate</button>
-      <button class="insp-tab" id="tab-explorer">LoRA Explorer</button>
+      <button class="insp-tab" id="tab-examples">LoRA Explorer</button>
     </div>
 
     <!-- Edit page -->
@@ -615,8 +586,6 @@ body{
         <select id="custom-lora-select" class="lora-native-select">
             <option value="None (no LoRA)">None (no LoRA)</option>
             <option value="4-Step Turbo (Viggle)">4-Step Turbo (Viggle)</option>
-            <option value="5-Step Turbo (Pruna)">5-Step Turbo (Pruna)</option>
-            <option value="8-Step Turbo (Pruna)">8-Step Turbo (Pruna)</option>
             <option value="Object Mover (prithivMLmods)">Object Mover (prithivMLmods)</option>
             <option value="Object Remover (prithivMLmods)">Object Remover (prithivMLmods)</option>
             <option value="Natural Exposure (prithivMLmods)">Natural Exposure (prithivMLmods)</option>
@@ -698,9 +667,9 @@ body{
       </div>
     </div>
 
-    <!-- LoRA Explorer page -->
-    <div class="insp-page" id="page-explorer">
-      <div class="lora-explorer-grid" id="lora-explorer-grid"></div>
+    <!-- Examples page -->
+    <div class="insp-page" id="page-examples">
+      <div class="examples-list" id="examples-scroll"></div>
     </div>
   </div>
 
@@ -777,9 +746,9 @@ const btnRedoBbox = document.getElementById('btn-redo-bbox');
 const btnClearBbox = document.getElementById('btn-clear-bbox');
 
 const tabEdit = document.getElementById('tab-edit');
-const tabExplorer = document.getElementById('tab-explorer');
+const tabExamples = document.getElementById('tab-examples');
 const pageEdit = document.getElementById('page-edit');
-const pageExplorer = document.getElementById('page-explorer');
+const pageExamples = document.getElementById('page-examples');
 
 /* ── State ── */
 let images = [];
@@ -1104,30 +1073,22 @@ promptInput.addEventListener('input', () => charCount.textContent = promptInput.
 loraSelect.addEventListener('change', (e) => {
     const mode = e.target.value;
     const isCustom = mode === "Custom LoRA (enter repo below)";
-    const isTurbo = mode === "4-Step Turbo (Viggle)" || mode === "5-Step Turbo (Pruna)" || mode === "8-Step Turbo (Pruna)";
+    const isTurbo = mode === "4-Step Turbo (Viggle)";
     
     customLoraGroup.style.display = isCustom ? 'flex' : 'none';
     
     if (isTurbo) {
-        if (mode === "4-Step Turbo (Viggle)") {
-            stepsSlider.value = 4; stepsVal.textContent = 4;
-            gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
-        } else if (mode === "5-Step Turbo (Pruna)") {
-            stepsSlider.value = 5; stepsVal.textContent = 5;
-            gpuDurSl.value = 60; gpuDurVal.textContent = '60s';
-        } else if (mode === "8-Step Turbo (Pruna)") {
-            stepsSlider.value = 8; stepsVal.textContent = 8;
-            gpuDurSl.value = 60; gpuDurVal.textContent = '60s';
-        }
+        stepsSlider.value = 4; stepsVal.textContent = 4;
         stepsSlider.disabled = true;
         cfgSlider.value = 1.0; cfgVal.textContent = '1.0';
         cfgSlider.disabled = true;
         negPromptInput.disabled = true;
+        gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
     } else {
         stepsSlider.disabled = false;
         cfgSlider.disabled = false;
         negPromptInput.disabled = false;
-        if (parseInt(gpuDurSl.value) <= 60) {
+        if (parseInt(gpuDurSl.value) === 30) {
             gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
         }
     }
@@ -1316,76 +1277,89 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-/* ── LoRA Explorer Tab Logic ── */
+/* ── Examples Tab Logic ── */
 tabEdit.addEventListener('click', () => {
-    tabEdit.classList.add('active'); tabExplorer.classList.remove('active');
-    pageEdit.classList.add('active'); pageExplorer.classList.remove('active');
+    tabEdit.classList.add('active'); tabExamples.classList.remove('active');
+    pageEdit.classList.add('active'); pageExamples.classList.remove('active');
 });
-tabExplorer.addEventListener('click', () => {
-    tabExplorer.classList.add('active'); tabEdit.classList.remove('active');
-    pageExplorer.classList.add('active'); pageEdit.classList.remove('active');
+tabExamples.addEventListener('click', () => {
+    tabExamples.classList.add('active'); tabEdit.classList.remove('active');
+    pageExamples.classList.add('active'); pageEdit.classList.remove('active');
 });
 
-async function loadExplorerItem(card, idx) {
+async function loadExample(card, idx) {
     if (!client) { showToast('Backend not connected', 'error'); return; }
-    document.querySelectorAll('.lora-card.loading').forEach(c => c.classList.remove('loading'));
+    document.querySelectorAll('.example-card.loading').forEach(c => c.classList.remove('loading'));
     card.classList.add('loading');
-    showToast('Loading LoRA item…', 'info');
+    showToast('Loading LoRA Card…', 'info');
     try {
-        const result = await client.predict('/load_explorer_item', { idx: idx });
+        const result = await client.predict('/load_example', { idx: idx });
         const data = result.data[0];
         if (data && data.status === 'ok' && data.images && data.images.length > 0) {
             clearAll();
             if (data.prompt) { promptInput.value = data.prompt; charCount.textContent = data.prompt.length; }
             data.images.forEach((b64, i) => {
-                const name = (data.names && data.names[i]) ? data.names[i] : ('input_' + (i + 1) + '.jpg');
+                const name = (data.names && data.names[i]) ? data.names[i] : ('example_' + (i + 1) + '.jpg');
                 addImage(b64, name);
             });
             
-            // Set mode to Custom LoRA and populate inputs
+            // Auto-fill custom LoRA fields and switch to Custom mode
+            if (data.repo) customRepoInput.value = data.repo;
+            if (data.weight) customWeightInput.value = data.weight;
             loraSelect.value = "Custom LoRA (enter repo below)";
-            customLoraGroup.style.display = 'flex';
-            customRepoInput.value = data.repo;
-            customWeightInput.value = data.weights;
+            
+            // Trigger change event manually to show the custom inputs
+            loraSelect.dispatchEvent(new Event('change'));
             
             tabEdit.click();
             setViewMode('input');
-            showToast('LoRA loaded successfully', 'info');
+            showToast('LoRA loaded. Ready to generate!', 'info');
         } else {
-            showToast('Could not load LoRA item', 'error');
+            showToast('Could not load LoRA images', 'error');
         }
     } catch (e) {
-        console.error('Explorer load error:', e);
-        showToast('Could not load LoRA item', 'error');
+        console.error('Example load error:', e);
+        showToast('Could not load LoRA images', 'error');
     } finally {
         card.classList.remove('loading');
     }
 }
 
-async function initExplorer() {
+async function initExamples() {
     try {
         const cfg = await fetch('/api/config').then(r => r.json());
-        const grid = document.getElementById('lora-explorer-grid');
-        grid.innerHTML = '';
-        cfg.lora_explorer.forEach(item => {
+        const list = document.getElementById('examples-scroll');
+        list.innerHTML = '';
+        cfg.examples.forEach(ex => {
             const card = document.createElement('div');
-            card.className = 'lora-card';
-            card.innerHTML = `
-                <img src="${item.cover_b64}" alt="${item.title}" class="lora-card-cover">
-                <div class="lora-card-body">
-                    <div class="lora-card-title">${item.title}</div>
-                    <div class="lora-card-repo">${item.repo}</div>
-                </div>
-            `;
-            card.addEventListener('click', () => loadExplorerItem(card, item.idx));
-            grid.appendChild(card);
+            card.className = 'example-card';
+            
+            const coverHtml = ex.cover
+                ? '<img src="' + ex.cover + '" alt="Cover">'
+                : '<div class="example-thumb-placeholder">No Cover</div>';
+            
+            const promptShort = ex.prompt.length > 100 ? ex.prompt.slice(0, 100) + '…' : ex.prompt;
+            
+            card.innerHTML =
+                '<div class="example-cover-wrap">' + coverHtml + '</div>'
+                + '<div class="example-body">'
+                +   '<div class="example-title"></div>'
+                +   '<div class="example-prompt-text"></div>'
+                + '</div>'
+                + '<div class="example-meta"><span class="example-lora-badge">' + ex.n_images + ' img' + (ex.n_images > 1 ? 's' : '') + '</span></div>';
+            
+            card.querySelector('.example-title').textContent = ex.title;
+            card.querySelector('.example-prompt-text').textContent = promptShort;
+            
+            card.addEventListener('click', () => loadExample(card, ex.idx));
+            list.appendChild(card);
         });
     } catch (e) {
-        console.error('Failed to load explorer config:', e);
+        console.error('Failed to load config for examples:', e);
     }
 }
 
-initExplorer();
+initExamples();
 renderFilmstrip();
 updateCounts();
 renderCanvas();
