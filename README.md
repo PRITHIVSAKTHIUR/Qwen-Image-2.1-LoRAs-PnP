@@ -1,27 +1,19 @@
-# **[Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP)**
+# **Qwen-Image-2.1-LoRAs-PnP**
 
-Qwen-Image-2.1-LoRAs-PnP is a flexible, plug-and-play image synthesis and editing platform built on top of the `Qwen/Qwen-Image-2.1` diffusion pipeline. Operating natively in `bfloat16`, the application consolidates text-to-image synthesis, multi-reference image editing, and transparent background (RGBA) generation inside a single unified framework.
+Qwen-Image-2.1-LoRAs-PnP is a modular image generation, multi-reference editing, and plug-and-play (PnP) LoRA execution studio powered by the `Qwen/Qwen-Image-2.1` base pipeline (`QwenImage21Pipeline`). The platform handles both text-to-image and complex image editing workflows (including object movement, object removal, natural exposure correction, head/face swapping, and native RGBA transparent generation) at 1K and 2K resolution tiers.
 
-The platform integrates a dynamic LoRA loading system supporting pre-configured community checkpoints—including 4-Step Turbo distillation (`Viggle/Qwen-Image-2.1-viggle-turbo`), spatial object manipulation (`Object Mover` and `Object Remover`), and `Natural Exposure`—along with support for arbitrary Hugging Face LoRA repositories. Built with a FastAPI backend server (`gradio.Server`) and a dark-mode frontend workspace, it includes image filmstrips, multi-reference queues, and an inspection engine.
+The system features dynamic lazy loading of pre-registered LoRAs (such as Viggle 4-Step Turbo, Object Mover, Object Remover, Natural Exposure, and Best Face Swap), as well as direct arbitrary LoRA loading from Hugging Face Hub repositories. It is served through a single-page web application (SPA) built with a FastAPI backend (`gradio.Server`) and a dark-themed client interface featuring an interactive bounding box annotator, history management, and a dedicated LoRA Explorer tray.
 
-
-<img width="1920" height="895" alt="Screenshot From 2026-09-25 09-14-12" src="https://github.com/user-attachments/assets/07250cf7-8fc6-4bfb-9b0e-0e4e0fcaf079" />
-<img width="1920" height="895" alt="Screenshot From 2026-09-25 08-44-53" src="https://github.com/user-attachments/assets/7956eb11-5cf4-49b6-84bc-9bdeedf61d37" />
-<img width="1920" height="895" alt="Screenshot From 2026-09-25 08-45-02" src="https://github.com/user-attachments/assets/3eaf2942-c818-41aa-b418-afa4e842ee3e" />
+<img width="1920" height="896" alt="Screenshot From 2026-09-27 17-25-07" src="https://github.com/user-attachments/assets/775da3ac-1f5f-406f-8553-7c37ebb26464" />
 
 ### **Key Features**
 
-* **Unified T2I, I2I & Multi-Reference Workflows:** Execute prompt-based generations or supply up to 10 visual references simultaneously for guided scene modifications, asset transpositions, and character editing.
-* **Plug-and-Play LoRA Architecture:** Features an on-demand adapter loader supporting:
-* `4-Step Turbo (Viggle)`: Distilled high-speed inference in 4 sampling steps.
-* `Object Mover (Bbox Preview)` & `Object Remover`: Precision object adjustments and removals.
-* `Natural Exposure`: Lighting and dynamic range refinement.
-* `Custom LoRA`: Load any compatible Qwen-Image-2.1 LoRA directly by entering a Hugging Face repository ID and optional weight filename.
-
-
-* **Native RGBA Transparency:** Generates isolated subjects with native alpha channel transparency using automatic prompt-formatting guards.
-* **Dynamic Resolution Tiers:** Supports standard aspect ratios (`1:1`, `4:3`, `3:4`, `3:2`, `2:3`, `16:9`, `9:16`) mapped across **1K (fast)** and **2K (native)** resolution tiers.
-* **VRAM Optimization & Text-Encoder Eviction:** Implements forward pre-hooks to temporarily evict the text encoder off GPU memory during VAE and transformer decoding stages, minimizing CUDA overhead.
+* **Unified Qwen-Image-2.1 Execution:** Handles text-to-image, multi-reference image composition (up to 10 images), and native alpha-channel RGBA transparency using `QwenImage21Pipeline`.
+* **Plug-and-Play (PnP) LoRA Hub:** Supports built-in presets alongside on-the-fly custom LoRA loading by providing any Hugging Face model repository ID and target `.safetensors` weight file.
+* **4-Step Turbo Mode:** Integrates Viggle's step-distilled turbo LoRA paired with `FlowMatchEulerDiscreteScheduler` to deliver high-quality outputs in 4 sampling steps.
+* **Canvas Bounding Box Annotator:** Includes client-side vector bounding box drawing tools directly over input reference images to guide spatial tasks like object movement and targeted object removal.
+* **Dynamic VRAM Management:** Incorporates forward pre-hooks to automatically evict the heavy vision-language text encoder to CPU after text encoding, freeing GPU memory for high-resolution 2K VAE decoding.
+* **Interactive Studio SPA:** A dark-mode single-page application featuring input filmstrips, an A/B result viewer, quick preset selectors, and an integrated LoRA visual explorer grid.
 
 ### **Repository Structure**
 
@@ -32,6 +24,25 @@ The platform integrates a dynamic LoRA loading system supporting pre-configured 
 │   ├── Screenshot From 2026-09-24 10-19-56.png
 │   ├── Screenshot From 2026-09-24 10-38-22.png
 │   └── Screenshot From 2026-09-24 10-40-29.png
+├── examples/
+│   ├── anime_input.jpg
+│   ├── exposure_input.jpg
+│   ├── faceswap_input_1.jpeg
+│   ├── faceswap_input_2.jpeg
+│   ├── objmv_input.jpg
+│   ├── objmvT_input.jpg
+│   ├── objrm_input.jpg
+│   ├── objrmT_input.jpg
+│   └── outpaint_input.jpg
+├── LoRA_Cover/
+│   ├── anime_cover.png
+│   ├── exposure_cover.png
+│   ├── faceswap_cover.png
+│   ├── objmv_cover.jpg
+│   ├── objmvT_cover.jpg
+│   ├── objrm_cover.jpg
+│   ├── objrmT_cover.jpg
+│   └── outpaint_cover.jpg
 ├── app.py
 ├── index.html
 ├── LICENSE
@@ -44,15 +55,15 @@ The platform integrates a dynamic LoRA loading system supporting pre-configured 
 
 ### **Installation and Requirements**
 
-To set up the environment locally, configure your system according to the specifications below. A dedicated CUDA-capable GPU is required.
+To set up the Qwen-Image-2.1-LoRAs-PnP environment locally, configure your system according to the specifications below. A modern CUDA-enabled GPU (with bfloat16 support) is required.
 
 * **Python Version:** Minimum Python **3.10.13** is required; Python **3.14** is recommended.
-* **PyTorch Version:** `torch==2.11.0` or above for optimal compatibility.
-* **CUDA Version:** **CUDA 13.0** is recommended (`--extra-index-url https://download.pytorch.org/whl/cu130`), matching the live Hugging Face demo.
+* **PyTorch Version:** `torch==2.11.0` or above is required for optimal system compatibility.
+* **CUDA Version:** **CUDA 13.0** is recommended (`--extra-index-url [https://download.pytorch.org/whl/cu130](https://download.pytorch.org/whl/cu130)`), matching the environment used on the live Hugging Face demo.
 
 #### **Running with `uv` (Recommended)**
 
-`uv` is an ultra-fast Python package and project manager written in Rust. It ensures rapid virtual environment setup and exact dependency synchronization based on `uv.lock`.
+`uv` is an ultra-fast Python package and project manager written in Rust. It ensures rapid virtual environment setup and exact dependency synchronization based on the `uv.lock` file.
 
 **Step 1 — Install `uv`**
 
@@ -70,10 +81,9 @@ cd Qwen-Image-2.1-LoRAs-PnP
 
 ```bash
 uv sync
-
 ```
 
-**Step 4 — Run the application**
+**Step 4 — Run the script**
 
 ```bash
 uv run app.py
@@ -82,13 +92,14 @@ uv run app.py
 #### **Standard PIP Implementation**
 
 **1. Update Package Manager**
+Upgrade your local package manager:
 
 ```bash
 pip install "pip>=26.2.1"
 ```
 
 **2. Install Core Dependencies**
-Install the primary deep learning stack and bleeding-edge diffusers dependencies:
+Install the primary deep learning stack, transformer libraries, and core computing utilities listed in `requirements.txt`:
 
 ```bash
 pip install -r requirements.txt
@@ -114,27 +125,19 @@ pillow>=12.3.0
 
 ### **Usage**
 
-Once initialized, open your browser to the local server address output in your terminal (typically `http://127.0.0.1:7860/`).
+Once the FastAPI web server initializes, open your browser to the local address output in your terminal (typically `http://127.0.0.1:7860/`).
 
-1. **Input Composition:**
-* Enter a descriptive generation or modification directive in the **Prompt** field.
-* *(Optional)* Drop or upload reference images into the canvas or filmstrip (supports up to 10 images for multi-reference editing).
+1. **Upload References (Optional):** Drag and drop one or more images into the main stage or use the rail upload button. Leave empty for text-to-image mode.
+2. **Select Mode & LoRA:**
+* Select a built-in preset from the **Mode & Resolution** dropdown (e.g., *4-Step Turbo*, *Object Mover*, *Object Remover*, *Natural Exposure*, or *Face Swap*).
+* Or choose **Custom LoRA (enter repo below)** to enter any public Hugging Face repository ID (e.g., `user/repo`) and weight filename to load it on the fly.
 
-
-2. **Select Mode & Resolution:**
-* Choose an adapter mode (e.g., `4-Step Turbo`, `Object Mover`, or select `Custom LoRA` to input your own Hugging Face model repository).
-* Set your target **Tier** (`1K (fast)` or `2K (native)`) and **Aspect Ratio**.
-
-
-3. **Configure Advanced Settings:**
-* Adjust inference steps (automatically locked to 4 when in Turbo mode).
-* Adjust Guidance Scale (CFG), Seed, or toggle **Transparent background (RGBA)**.
-
-
-4. **Execute:** Click **Generate Image** or press ⌘/Ctrl + Enter. The resulting output will populate the central interactive canvas with one-click download access.
+3. **Bounding Box Annotation:** When performing localized tasks like object movement or removal, click the **BBox** tool in the left rail to draw target red bounding boxes directly over the input image.
+4. **Configure Parameters:** Adjust resolution tier (`1K` or `2K`), aspect ratio, inference steps, and guidance scale. Toggle **Transparent background (RGBA)** if alpha-channel output is required.
+5. **Execute:** Click **Generate Image** or press ⌘/Ctrl + Enter. The result will render in the primary canvas and display generation metadata in the inspector panel.
 
 ### **License and Source**
 
-* **License:** [Qwen RESEARCH LICENSE](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP/blob/main/LICENSE?utm_source=gemini)
+* **License:** [Qwen Research License Agreement](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP/blob/main/LICENSE?utm_source=gemini)
 * **GitHub Repository:** [https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git?utm_source=gemini)
 * **Hugging Face Live Space:** [https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP?utm_source=gemini)
