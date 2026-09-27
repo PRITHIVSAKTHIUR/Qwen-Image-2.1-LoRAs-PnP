@@ -369,17 +369,58 @@ body{
     font-family: 'Inter', sans-serif; font-style: italic;
 }
 
-/* LoRA Explorer page */
-.explorer-grid{padding:12px 14px;display:grid;grid-template-columns:repeat(2, 1fr);gap:10px}
-.explorer-card{
-    background:var(--panel2);border:1px solid var(--border);
-    border-radius:10px;overflow:hidden;cursor:pointer;transition:all .2s ease;flex-shrink:0;
-    display:flex;flex-direction:column;
+/* LoRA Explorer Grid */
+.lora-explorer-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    padding: 14px;
 }
-.explorer-card:hover{border-color:var(--accent);box-shadow:0 4px 14px rgba(30,144,255,.15)}
-.explorer-card.loading{opacity:.5;pointer-events:none}
-.explorer-cover{width:100%;height:100px;object-fit:cover;background:var(--panel)}
-.explorer-body{padding:8px;font-size:11px;font-weight:600;color:var(--accent2);text-align:center}
+.lora-card {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+}
+.lora-card:hover {
+    border-color: var(--accent);
+    box-shadow: 0 4px 14px rgba(30,144,255,.15);
+    transform: translateY(-2px);
+}
+.lora-card.loading { opacity: 0.5; pointer-events: none; }
+.lora-card-cover {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    background: #000;
+    border-bottom: 1px solid var(--border);
+}
+.lora-card-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.lora-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.lora-card-repo {
+    font-size: 9px;
+    color: var(--dim);
+    font-family: 'JetBrains Mono', monospace;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
 
 /* ══ Status bar ══ */
 .statusbar{
@@ -452,7 +493,6 @@ body{
     .modern-textarea{font-size:16px} .btn-run{padding:14px 24px;font-size:15px}
     .statusbar{flex-wrap:wrap;height:auto;min-height:var(--statusbar-h);padding:4px 10px;gap:2px}
     .sb-link{display:none} .toast-notification{max-width:calc(100vw - 32px);font-size:12px;padding:10px 16px}
-    .explorer-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -658,9 +698,9 @@ body{
       </div>
     </div>
 
-    <!-- Explorer page -->
+    <!-- LoRA Explorer page -->
     <div class="insp-page" id="page-explorer">
-      <div class="explorer-grid" id="explorer-grid"></div>
+      <div class="lora-explorer-grid" id="lora-explorer-grid"></div>
     </div>
   </div>
 
@@ -1064,29 +1104,30 @@ promptInput.addEventListener('input', () => charCount.textContent = promptInput.
 loraSelect.addEventListener('change', (e) => {
     const mode = e.target.value;
     const isCustom = mode === "Custom LoRA (enter repo below)";
-    const isTurbo = ["4-Step Turbo (Viggle)", "5-Step Turbo (Pruna)", "8-Step Turbo (Pruna)"].includes(mode);
+    const isTurbo = mode === "4-Step Turbo (Viggle)" || mode === "5-Step Turbo (Pruna)" || mode === "8-Step Turbo (Pruna)";
     
     customLoraGroup.style.display = isCustom ? 'flex' : 'none';
     
     if (isTurbo) {
+        if (mode === "4-Step Turbo (Viggle)") {
+            stepsSlider.value = 4; stepsVal.textContent = 4;
+            gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
+        } else if (mode === "5-Step Turbo (Pruna)") {
+            stepsSlider.value = 5; stepsVal.textContent = 5;
+            gpuDurSl.value = 60; gpuDurVal.textContent = '60s';
+        } else if (mode === "8-Step Turbo (Pruna)") {
+            stepsSlider.value = 8; stepsVal.textContent = 8;
+            gpuDurSl.value = 60; gpuDurVal.textContent = '60s';
+        }
         stepsSlider.disabled = true;
         cfgSlider.value = 1.0; cfgVal.textContent = '1.0';
         cfgSlider.disabled = true;
         negPromptInput.disabled = true;
-        gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
-        
-        if (mode === "4-Step Turbo (Viggle)") {
-            stepsSlider.value = 4; stepsVal.textContent = 4;
-        } else if (mode === "5-Step Turbo (Pruna)") {
-            stepsSlider.value = 5; stepsVal.textContent = 5;
-        } else if (mode === "8-Step Turbo (Pruna)") {
-            stepsSlider.value = 8; stepsVal.textContent = 8;
-        }
     } else {
         stepsSlider.disabled = false;
         cfgSlider.disabled = false;
         negPromptInput.disabled = false;
-        if (parseInt(gpuDurSl.value) === 30) {
+        if (parseInt(gpuDurSl.value) <= 60) {
             gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
         }
     }
@@ -1275,7 +1316,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-/* ── LoRA Explorer Logic ── */
+/* ── LoRA Explorer Tab Logic ── */
 tabEdit.addEventListener('click', () => {
     tabEdit.classList.add('active'); tabExplorer.classList.remove('active');
     pageEdit.classList.add('active'); pageExplorer.classList.remove('active');
@@ -1285,45 +1326,37 @@ tabExplorer.addEventListener('click', () => {
     pageExplorer.classList.add('active'); pageEdit.classList.remove('active');
 });
 
-async function loadExplorerCard(card, idx) {
+async function loadExplorerItem(card, idx) {
     if (!client) { showToast('Backend not connected', 'error'); return; }
-    document.querySelectorAll('.explorer-card.loading').forEach(c => c.classList.remove('loading'));
+    document.querySelectorAll('.lora-card.loading').forEach(c => c.classList.remove('loading'));
     card.classList.add('loading');
-    showToast('Loading LoRA & Assets…', 'info');
+    showToast('Loading LoRA item…', 'info');
     try {
-        const result = await client.predict('/load_lora_explorer', { idx: idx });
+        const result = await client.predict('/load_explorer_item', { idx: idx });
         const data = result.data[0];
         if (data && data.status === 'ok' && data.images && data.images.length > 0) {
             clearAll();
             if (data.prompt) { promptInput.value = data.prompt; charCount.textContent = data.prompt.length; }
+            data.images.forEach((b64, i) => {
+                const name = (data.names && data.names[i]) ? data.names[i] : ('input_' + (i + 1) + '.jpg');
+                addImage(b64, name);
+            });
             
-            // Auto switch to Custom LoRA mode and populate inputs
+            // Set mode to Custom LoRA and populate inputs
             loraSelect.value = "Custom LoRA (enter repo below)";
             customLoraGroup.style.display = 'flex';
             customRepoInput.value = data.repo;
-            customWeightInput.value = data.weight;
-            
-            // Reset turbo settings if previously enabled
-            stepsSlider.disabled = false;
-            cfgSlider.disabled = false;
-            negPromptInput.disabled = false;
-            if (parseInt(gpuDurSl.value) === 30) {
-                gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
-            }
-            
-            data.images.forEach((b64, i) => {
-                addImage(b64, `input_${i+1}.jpg`);
-            });
+            customWeightInput.value = data.weights;
             
             tabEdit.click();
             setViewMode('input');
-            showToast('Ready to generate!', 'info');
+            showToast('LoRA loaded successfully', 'info');
         } else {
-            showToast('Could not load explorer assets', 'error');
+            showToast('Could not load LoRA item', 'error');
         }
     } catch (e) {
         console.error('Explorer load error:', e);
-        showToast('Could not load explorer assets', 'error');
+        showToast('Could not load LoRA item', 'error');
     } finally {
         card.classList.remove('loading');
     }
@@ -1332,16 +1365,19 @@ async function loadExplorerCard(card, idx) {
 async function initExplorer() {
     try {
         const cfg = await fetch('/api/config').then(r => r.json());
-        const grid = document.getElementById('explorer-grid');
+        const grid = document.getElementById('lora-explorer-grid');
         grid.innerHTML = '';
-        cfg.explorer.forEach(ex => {
+        cfg.lora_explorer.forEach(item => {
             const card = document.createElement('div');
-            card.className = 'explorer-card';
+            card.className = 'lora-card';
             card.innerHTML = `
-                <img src="${ex.cover}" class="explorer-cover" alt="${ex.title}">
-                <div class="explorer-body">${ex.title}</div>
+                <img src="${item.cover_b64}" alt="${item.title}" class="lora-card-cover">
+                <div class="lora-card-body">
+                    <div class="lora-card-title">${item.title}</div>
+                    <div class="lora-card-repo">${item.repo}</div>
+                </div>
             `;
-            card.addEventListener('click', () => loadExplorerCard(card, ex.idx));
+            card.addEventListener('click', () => loadExplorerItem(card, item.idx));
             grid.appendChild(card);
         });
     } catch (e) {
