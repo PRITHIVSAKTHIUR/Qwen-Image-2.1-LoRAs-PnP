@@ -5,7 +5,6 @@ import base64
 import json
 from io import BytesIO
 from typing import List, Tuple
-from pathlib import Path
 
 import numpy as np
 import spaces
@@ -16,14 +15,22 @@ from gradio import Server
 from fastapi.responses import HTMLResponse
 from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 
-# Before torch: ZeroGPU. expandable_segments avoids the fragmentation OOM that shows up on ZeroGPU
-os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
-
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
 TURBO_REPO = os.environ.get("TURBO_REPO", "Viggle/Qwen-Image-2.1-viggle-turbo")
 TURBO_LORA_FILE = "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
 TURBO_ADAPTER_NAME = "turbo"
 TURBO_STEPS = 4
+
+PRUNA5_REPO = "PrunaAI/Pruna-Qwen-Image-2.1"
+PRUNA5_LORA_FILE = "p_qwen_image_2.1_5step_v0.1.safetensors"
+PRUNA5_ADAPTER_NAME = "pruna5"
+PRUNA5_STEPS = 5
+
+PRUNA8_REPO = "PrunaAI/Pruna-Qwen-Image-2.1"
+PRUNA8_LORA_FILE = "p_qwen_image_2.1_8step_v0.1.safetensors"
+PRUNA8_ADAPTER_NAME = "pruna8"
+PRUNA8_STEPS = 8
+
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 OBJECT_MOVER_REPO = "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview"
@@ -42,36 +49,29 @@ FACE_SWAP_ALISSON_REPO = "Alissonerdx/BFS-Best-Face-Swap"
 FACE_SWAP_ALISSON_FILE = "bfs_head_v1.1_qwen_2.1.safetensors"
 FACE_SWAP_ALISSON_ADAPTER = "face_swap_alisson"
 
-# Pruna Turbo Configuration
-PRUNA_REPO = "PrunaAI/Pruna-Qwen-Image-2.1"
-PRUNA_5STEP_FILE = "p_qwen_image_2.1_5step_v0.1.safetensors"
-PRUNA_8STEP_FILE = "p_qwen_image_2.1_8step_v0.1.safetensors"
-PRUNA_5_ADAPTER = "pruna_5step"
-PRUNA_8_ADAPTER = "pruna_8step"
-STEPS_TO_SIGMAS = {
-    5: [1.0, 0.94, 6 / 7, 2 / 3, 0.4],
-    8: [1.0, 14 / 15, 6 / 7, 10 / 13, 2 / 3, 6 / 11, 0.4, 2 / 9],
-}
-
 MAX_SEED = np.iinfo(np.int32).max
 MAX_REF_IMAGES = 10
 
 DEFAULT_MODE = "None (no LoRA)"
 TURBO_MODE = "4-Step Turbo (Viggle)"
-PRUNA_5_MODE = "5-Step Pruna Turbo"
-PRUNA_8_MODE = "8-Step Pruna Turbo"
+PRUNA5_MODE = "5-Step Turbo (Pruna)"
+PRUNA8_MODE = "8-Step Turbo (Pruna)"
 OBJECT_MOVER_MODE = "Object Mover (prithivMLmods)"
 OBJECT_REMOVER_MODE = "Object Remover (prithivMLmods)"
 NATURAL_EXPOSURE_MODE = "Natural Exposure (prithivMLmods)"
 FACE_SWAP_ALISSON_MODE = "Face Swap (Alissonerdx)"
 CUSTOM_MODE = "Custom LoRA (enter repo below)"
 
-MODE_CHOICES = [DEFAULT_MODE, TURBO_MODE, PRUNA_5_MODE, PRUNA_8_MODE, OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, FACE_SWAP_ALISSON_MODE, CUSTOM_MODE]
+MODE_CHOICES = [
+    DEFAULT_MODE, TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE, 
+    OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, 
+    FACE_SWAP_ALISSON_MODE, CUSTOM_MODE
+]
 
 LORA_PRESETS = {
     TURBO_MODE: (TURBO_REPO, TURBO_LORA_FILE, TURBO_ADAPTER_NAME),
-    PRUNA_5_MODE: (PRUNA_REPO, PRUNA_5STEP_FILE, PRUNA_5_ADAPTER),
-    PRUNA_8_MODE: (PRUNA_REPO, PRUNA_8STEP_FILE, PRUNA_8_ADAPTER),
+    PRUNA5_MODE: (PRUNA5_REPO, PRUNA5_LORA_FILE, PRUNA5_ADAPTER_NAME),
+    PRUNA8_MODE: (PRUNA8_REPO, PRUNA8_LORA_FILE, PRUNA8_ADAPTER_NAME),
     OBJECT_MOVER_MODE: (OBJECT_MOVER_REPO, OBJECT_MOVER_FILE, OBJECT_MOVER_ADAPTER),
     OBJECT_REMOVER_MODE: (OBJECT_REMOVER_REPO, OBJECT_REMOVER_FILE, OBJECT_REMOVER_ADAPTER),
     NATURAL_EXPOSURE_MODE: (NATURAL_EXPOSURE_REPO, NATURAL_EXPOSURE_FILE, NATURAL_EXPOSURE_ADAPTER),
@@ -96,59 +96,67 @@ RGBA_SUFFIX = " The image has alpha channel and the background is transparent."
 
 LORA_EXPLORER_CONFIG = [
     {
+        "title": "Anime Consistency",
         "repo": "WarmBloodAban/Qwen-Image-2.1-LoRAs",
-        "weight_name": "Qwen2.1_Anime_consistency.safetensors",
-        "images": ["examples/anime_input.jpg"],
+        "weights": "Qwen2.1_Anime_consistency.safetensors",
         "prompt": "Transform into anime.",
+        "images": ["examples/anime_input.jpg"],
         "cover": "LoRA_Cover/anime_cover.png"
     },
     {
+        "title": "Natural Exposure",
         "repo": "prithivMLmods/Qwen-Image-2.1-Natural-Exposure-LoRA",
-        "weight_name": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
-        "images": ["examples/exposure_input.jpg"],
+        "weights": "Qwen-Image-2.1-Natural-Exposure-LoRA-4000.safetensors",
         "prompt": "Transform the image with balanced neutral exposure",
+        "images": ["examples/exposure_input.jpg"],
         "cover": "LoRA_Cover/exposure_cover.png"
     },
     {
+        "title": "Object Mover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview",
-        "weight_name": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
-        "images": ["examples/objmv_input.jpg"],
+        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-Preview-5000.safetensors",
         "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
+        "images": ["examples/objmv_input.jpg"],
         "cover": "LoRA_Cover/objmv_cover.jpg"
     },
     {
+        "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
-        "weight_name": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
-        "images": ["examples/objrmT_input.jpg"],
+        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
         "prompt": "Remove the red highlighted object from the scene.",
+        "images": ["examples/objrmT_input.jpg"],
         "cover": "LoRA_Cover/objrmT_cover.jpg"
     },
     {
+        "title": "Object Remover (Preview)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-Preview",
-        "weight_name": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
-        "images": ["examples/objrm_input.jpg"],
+        "weights": "Qwen-Image-2.1-Object-Remover-Bbox-Preview-5000.safetensors",
         "prompt": "Remove the red highlighted object from the scene.",
+        "images": ["examples/objrm_input.jpg"],
         "cover": "LoRA_Cover/objrm_cover.jpg"
     },
     {
+        "title": "Object Mover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-turbo",
-        "weight_name": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
-        "images": ["examples/objmvT_input.jpg"],
+        "weights": "Qwen-Image-2.1-Object-Mover-Bbox-turbo-4000.safetensors",
         "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene.",
+        "images": ["examples/objmvT_input.jpg"],
         "cover": "LoRA_Cover/objmvT_cover.jpg"
     },
     {
+        "title": "Outpaint",
         "repo": "ausboss/Qwen-Image-2.1-Outpaint-LoRA",
-        "weight_name": "qwen-image-2.1-outpaint-v2.safetensors",
-        "images": ["examples/outpaint_input.jpg"],
+        "weights": "qwen-image-2.1-outpaint-v2.safetensors",
         "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
-        "cover": "LoRA_Cover/objmvT_cover.jpg"
+        "images": ["examples/outpaint_input.jpg"],
+        "cover": "LoRA_Cover/objmvT_cover.jpg" 
     },
     {
+        "title": "Best Face Swap",
         "repo": "Alissonerdx/BFS-Best-Face-Swap",
-        "weight_name": "bfs_head_v1.1_qwen_2.1.safetensors",
-        "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
+        "weights": "bfs_head_v1.1_qwen_2.1.safetensors",
         "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k",
+        "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
         "cover": "LoRA_Cover/faceswap_cover.png"
     }
 ]
@@ -161,30 +169,13 @@ print(f"Loading turbo LoRA from {TURBO_REPO} ...", flush=True)
 pipe.load_lora_weights(
     TURBO_REPO, weight_name=TURBO_LORA_FILE, adapter_name=TURBO_ADAPTER_NAME, token=HF_TOKEN,
 )
-
-print(f"Loading Pruna 5-Step LoRA ...", flush=True)
-pipe.load_lora_weights(
-    PRUNA_REPO, weight_name=PRUNA_5STEP_FILE, adapter_name=PRUNA_5_ADAPTER, token=HF_TOKEN,
-)
-
-print(f"Loading Pruna 8-Step LoRA ...", flush=True)
-pipe.load_lora_weights(
-    PRUNA_REPO, weight_name=PRUNA_8STEP_FILE, adapter_name=PRUNA_8_ADAPTER, token=HF_TOKEN,
-)
-
 pipe.disable_lora()
-print("Turbo and Pruna LoRAs loaded (inactive).", flush=True)
+print("Turbo LoRA loaded (inactive).", flush=True)
 
-_LOADED_ADAPTERS = {TURBO_ADAPTER_NAME, PRUNA_5_ADAPTER, PRUNA_8_ADAPTER}
+_LOADED_ADAPTERS = {TURBO_ADAPTER_NAME}
 
 default_scheduler = pipe.scheduler
 turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config, shift_terminal=None)
-pruna_scheduler = FlowMatchEulerDiscreteScheduler.from_config(
-    pipe.scheduler.config,
-    use_dynamic_shifting=False,
-    shift=1.0,
-    shift_terminal=None,
-)
 
 patch_embed = pipe.text_encoder.model.visual.patch_embed
 
@@ -238,7 +229,7 @@ for component in (pipe.vae, pipe.transformer):
 
 def _run_pipeline(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora
+    negative_prompt, guidance_scale, seed, turbo, lora
 ):
     if lora:
         _ensure_lora_loaded(lora["adapter_name"], lora["repo"], lora.get("weight_name"))
@@ -246,13 +237,7 @@ def _run_pipeline(
         pipe.set_adapters([lora["adapter_name"]], adapter_weights=[1.0])
     else:
         pipe.disable_lora()
-        
-    if turbo:
-        pipe.scheduler = turbo_scheduler
-    elif pruna_steps > 0:
-        pipe.scheduler = pruna_scheduler
-    else:
-        pipe.scheduler = default_scheduler
+    pipe.scheduler = turbo_scheduler if turbo else default_scheduler
 
     encoder_device = next(pipe.text_encoder.parameters()).device
     if encoder_device.type != "cuda":
@@ -261,7 +246,7 @@ def _run_pipeline(
     torch.cuda.reset_peak_memory_stats()
     lora_tag = lora["adapter_name"] if lora else "none"
     _vram_note(
-        f"start {output_resolution}px, lora={lora_tag}, turbo={turbo}, pruna={pruna_steps}, "
+        f"start {output_resolution}px, lora={lora_tag}, turbo={turbo}, "
         f"text encoder was on {encoder_device}"
     )
 
@@ -272,9 +257,6 @@ def _run_pipeline(
         "generator": generator,
         "output_resolution": int(output_resolution),
     }
-    if pruna_steps > 0:
-        kwargs["sigmas"] = torch.tensor(STEPS_TO_SIGMAS[pruna_steps], device="cuda")
-        
     if width:
         kwargs["width"] = int(width)
         kwargs["height"] = int(height)
@@ -294,28 +276,28 @@ def _run_pipeline(
 
 def _gpu_duration_func(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
 ):
     return int(gpu_duration)
 
 @spaces.GPU(duration=_gpu_duration_func)
 def _generate(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
-        negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora
+        negative_prompt, guidance_scale, seed, turbo, lora
     )
 
 @spaces.GPU(duration=_gpu_duration_func, size="xlarge")
 def _generate_full_gpu(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
-        negative_prompt, guidance_scale, seed, turbo, pruna_steps, lora
+        negative_prompt, guidance_scale, seed, turbo, lora
     )
 
 def b64_to_pil_list(b64_json_str):
@@ -345,31 +327,19 @@ def pil_to_b64_png(image: Image.Image) -> str:
     image.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
 
-def make_thumb_b64(path, max_dim=220):
+def make_thumb_b64(path, max_dim=400):
     if not os.path.exists(path):
         return ""
     try:
         img = Image.open(path).convert("RGB")
         img.thumbnail((max_dim, max_dim), Image.LANCZOS)
         buf = BytesIO()
-        img.save(buf, format="JPEG", quality=65)
+        img.save(buf, format="JPEG", quality=80)
         return f"data:image/jpeg;base64,{base64.b64encode(buf.getvalue()).decode()}"
     except Exception:
         return ""
 
 def encode_full_image(path):
-    if not os.path.exists(path):
-        return ""
-    try:
-        with open(path, "rb") as f:
-            data = f.read()
-        ext = path.rsplit(".", 1)[-1].lower()
-        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
-        return f"data:{mime};base64,{base64.b64encode(data).decode()}"
-    except Exception:
-        return ""
-
-def encode_cover_b64(path):
     if not os.path.exists(path):
         return ""
     try:
@@ -389,20 +359,14 @@ def generate(
     if not prompt:
         raise gr.Error("Enter a prompt.")
 
-    turbo = mode == TURBO_MODE
-    pruna_steps = 0
-    if mode == PRUNA_5_MODE:
-        pruna_steps = 5
-        num_inference_steps = 5
-        guidance_scale = 1.0
-        negative_prompt = ""
-    elif mode == PRUNA_8_MODE:
-        pruna_steps = 8
-        num_inference_steps = 8
-        guidance_scale = 1.0
-        negative_prompt = ""
-    elif turbo:
-        num_inference_steps = TURBO_STEPS
+    turbo = mode in [TURBO_MODE, PRUNA5_MODE, PRUNA8_MODE]
+    if turbo:
+        if mode == TURBO_MODE:
+            num_inference_steps = TURBO_STEPS
+        elif mode == PRUNA5_MODE:
+            num_inference_steps = PRUNA5_STEPS
+        elif mode == PRUNA8_MODE:
+            num_inference_steps = PRUNA8_STEPS
         guidance_scale = 1.0
         negative_prompt = ""
 
@@ -445,7 +409,7 @@ def generate(
     runner = _generate_full_gpu if _needs_full_gpu(output_resolution, pil_refs) else _generate
     image = runner(
         prompt, pil_refs, width, height, output_resolution, int(num_inference_steps),
-        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, pruna_steps, lora_config, int(gpu_duration)
+        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config, int(gpu_duration)
     )
 
     run_mode = "edit" if pil_refs else "text-to-image"
@@ -495,15 +459,15 @@ def infer(
         "seed": used_seed
     }
 
-@app.api(name="load_explorer_card", queue=False)
-def load_explorer_card(idx: float) -> dict:
-    """Return base64-encoded images + prompt + lora info for a given explorer card index."""
+@app.api(name="load_explorer_item", queue=False)
+def load_explorer_item(idx: float) -> dict:
+    """Return base64-encoded input images + prompt + LoRA details for a given explorer item."""
     try:
         i = int(idx)
     except (ValueError, TypeError):
         i = -1
     if i < 0 or i >= len(LORA_EXPLORER_CONFIG):
-        return {"images": [], "prompt": "", "repo": "", "weight": "", "names": [], "status": "error"}
+        return {"images": [], "prompt": "", "repo": "", "weights": "", "names": [], "status": "error"}
     ex = LORA_EXPLORER_CONFIG[i]
     b64_list, names = [], []
     for path in ex["images"]:
@@ -512,11 +476,11 @@ def load_explorer_card(idx: float) -> dict:
             b64_list.append(b64)
             names.append(os.path.basename(path))
     return {
-        "images": b64_list,
-        "prompt": ex["prompt"],
-        "repo": ex["repo"],
-        "weight": ex["weight_name"],
-        "names": names,
+        "images": b64_list, 
+        "prompt": ex["prompt"], 
+        "repo": ex["repo"], 
+        "weights": ex["weights"], 
+        "names": names, 
         "status": "ok"
     }
 
@@ -526,11 +490,11 @@ def client_config():
     for i, ex in enumerate(LORA_EXPLORER_CONFIG):
         explorer_payload.append({
             "idx": i,
-            "cover": encode_cover_b64(ex["cover"]),
-            "prompt": ex["prompt"],
+            "title": ex["title"],
             "repo": ex["repo"],
+            "cover_b64": make_thumb_b64(ex["cover"])
         })
-    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "explorer": explorer_payload}
+    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "lora_explorer": explorer_payload}
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
