@@ -1,4 +1,4 @@
-# **Qwen-Image-2.1-LoRAs-PnP**
+# **[Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP)**
 
 Qwen-Image-2.1-LoRAs-PnP is a modular image generation, multi-reference editing, and plug-and-play (PnP) LoRA execution studio powered by the `Qwen/Qwen-Image-2.1` base pipeline (`QwenImage21Pipeline`). The platform handles both text-to-image and complex image editing workflows (including object movement, object removal, natural exposure correction, head/face swapping, and native RGBA transparent generation) at 1K and 2K resolution tiers.
 
