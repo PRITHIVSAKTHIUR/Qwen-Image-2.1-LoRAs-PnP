@@ -149,7 +149,7 @@ LORA_EXPLORER_CONFIG = [
         "weights": "qwen-image-2.1-outpaint-v2.safetensors",
         "prompt": "Outpaint the image: replace the solid gray areas with a seamless continuation of the scene, keeping the existing picture unchanged.",
         "images": ["examples/outpaint_input.jpg"],
-        "cover": "LoRA_Cover/objmvT_cover.jpg" 
+        "cover": "LoRA_Cover/outpaint_cover.jpg" 
     },
     {
         "title": "Best Face Swap",
