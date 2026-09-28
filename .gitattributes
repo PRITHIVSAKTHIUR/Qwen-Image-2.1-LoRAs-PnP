@@ -48,3 +48,5 @@ LoRA_Cover/objmvT_cover.jpg filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/objrmT_cover.jpg filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/consistency_cover.png filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/camera_angle_cover.png filter=lfs diff=lfs merge=lfs -text
+examples/camera_angle_input_1.jpg filter=lfs diff=lfs merge=lfs -text
+examples/camera_angle_input_2.jpg filter=lfs diff=lfs merge=lfs -text
