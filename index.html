@@ -296,6 +296,11 @@ body{
 }
 .btn-run:active:not(:disabled){transform:translateY(0)}
 .btn-run:disabled{opacity:.55;cursor:not-allowed}
+.run-hint{
+    text-align:center;font-size:10px;color:var(--faint);margin-top:8px;
+    font-family:'JetBrains Mono',monospace;
+}
+
 .btn-cancel{
     display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
     margin-top:8px;background:transparent;border:1px solid var(--border2);border-radius:9px;
@@ -303,10 +308,6 @@ body{
     color:var(--muted);transition:all .15s;
 }
 .btn-cancel:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
-.run-hint{
-    text-align:center;font-size:10px;color:var(--faint);margin-top:8px;
-    font-family:'JetBrains Mono',monospace;
-}
 
 .slider-row{display:flex;align-items:center;gap:9px;min-height:26px;margin-bottom:10px}
 .slider-row:last-child{margin-bottom:0}
@@ -1292,15 +1293,10 @@ async function runEdit() {
             }
         }
     } catch (e) {
-        if (e && e.message && e.message.includes('Cancelled')) {
-            hideLoader('Cancelled');
-            showToast('Generation cancelled', 'warning');
-        } else {
-            console.error('Edit error:', e);
-            hideLoader('Error', 'error');
-            const msg = (e && e.message) ? e.message : 'Generation failed';
-            showToast(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, 'error');
-        }
+        console.error('Edit error:', e);
+        hideLoader('Error', 'error');
+        const msg = (e && e.message) ? e.message : 'Generation failed';
+        showToast(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, 'error');
     } finally {
         setRunningUI(false);
         currentJob = null;
