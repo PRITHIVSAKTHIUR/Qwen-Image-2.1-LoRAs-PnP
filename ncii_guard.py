@@ -19,7 +19,7 @@ import subprocess
 import sys
 import threading
 
-GUARD_REPO = "hfmlsoc/ncii-guard-v02" #@v01 - https://huggingface.co/hfmlsoc/ncii-light-guard-v01
+GUARD_REPO = "hfmlsoc/ncii-guard-v02"
 
 _lock = threading.Lock()
 _process: subprocess.Popen | None = None
