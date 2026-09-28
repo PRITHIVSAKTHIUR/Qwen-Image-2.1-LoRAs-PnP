@@ -296,6 +296,13 @@ body{
 }
 .btn-run:active:not(:disabled){transform:translateY(0)}
 .btn-run:disabled{opacity:.55;cursor:not-allowed}
+.btn-cancel{
+    display:flex;align-items:center;justify-content:center;gap:6px;width:100%;
+    margin-top:8px;background:transparent;border:1px solid var(--border2);border-radius:9px;
+    padding:8px 24px;cursor:pointer;font-size:12px;font-weight:600;font-family:'Inter',sans-serif;
+    color:var(--muted);transition:all .15s;
+}
+.btn-cancel:hover{border-color:#ef4444;color:#ef4444;background:rgba(239,68,68,.08)}
 .run-hint{
     text-align:center;font-size:10px;color:var(--faint);margin-top:8px;
     font-family:'JetBrains Mono',monospace;
@@ -647,6 +654,7 @@ body{
         <button id="custom-run-btn" class="btn-run">
           <span id="run-btn-label">Generate Image</span>
         </button>
+        <button id="custom-cancel-btn" class="btn-cancel" style="display:none;">Cancel</button>
         <div class="run-hint">⌘/Ctrl + Enter</div>
       </div>
 
@@ -734,6 +742,7 @@ const tierSelect   = document.getElementById('custom-tier');
 const aspectSelect = document.getElementById('custom-aspect');
 const runBtn       = document.getElementById('custom-run-btn');
 const runBtnLabel  = document.getElementById('run-btn-label');
+const cancelBtn    = document.getElementById('custom-cancel-btn');
 const sbStatus     = document.getElementById('sb-status');
 const loader       = document.getElementById('output-loader');
 const loaderText   = document.getElementById('loader-text');
@@ -1183,6 +1192,7 @@ function setRunningUI(on) {
     running = on;
     runBtn.disabled = on;
     runBtnLabel.textContent = on ? 'Generating…' : 'Generate Image';
+    cancelBtn.style.display = on ? 'flex' : 'none';
 }
 
 async function runEdit() {
@@ -1282,10 +1292,15 @@ async function runEdit() {
             }
         }
     } catch (e) {
-        console.error('Edit error:', e);
-        hideLoader('Error', 'error');
-        const msg = (e && e.message) ? e.message : 'Generation failed';
-        showToast(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, 'error');
+        if (e && e.message && e.message.includes('Cancelled')) {
+            hideLoader('Cancelled');
+            showToast('Generation cancelled', 'warning');
+        } else {
+            console.error('Edit error:', e);
+            hideLoader('Error', 'error');
+            const msg = (e && e.message) ? e.message : 'Generation failed';
+            showToast(msg.length > 120 ? msg.slice(0, 120) + '…' : msg, 'error');
+        }
     } finally {
         setRunningUI(false);
         currentJob = null;
@@ -1293,6 +1308,16 @@ async function runEdit() {
 }
 
 runBtn.addEventListener('click', runEdit);
+
+cancelBtn.addEventListener('click', async () => {
+    if (currentJob) {
+        try { await currentJob.cancel(); } catch (e) { console.warn('Cancel error:', e); }
+        currentJob = null;
+    }
+    setRunningUI(false);
+    hideLoader('Cancelled');
+    showToast('Generation cancelled', 'warning');
+});
 
 document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
