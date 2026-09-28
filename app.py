@@ -84,6 +84,37 @@ ASPECTS = ["auto (reference or 1:1)", "1:1", "4:3", "3:4", "3:2", "2:3", "16:9",
 RGBA_PREFIX = "This is an RGBA image with transparency. "
 RGBA_SUFFIX = " The image has alpha channel and the background is transparent."
 
+# ── NCII safety guard (pure CPU subprocess, never touches spaces/CUDA) ──────
+NCII_UNSAFE_LABEL = "ncii"
+NCII_THRESHOLD = 0.5
+NCII_BLOCK_MESSAGE = "This prompt was flagged by the NCII content filter and was not processed. Please try again with a different prompt."
+
+print("Starting NCII safety guard subprocess (CPU-only)…")
+try:
+    ncii_guard.start()
+    print("NCII guard subprocess ready.")
+except Exception as e:
+    print(f"Warning: Could not start NCII guard subprocess: {e}")
+
+
+def check_ncii_safety(prompt_text):
+    """Ask the CPU-side subprocess. No GPU is requested by this call.
+
+    Returns: (is_unsafe: bool, label: str, score: float)
+    """
+    if not prompt_text or not prompt_text.strip():
+        return False, "unknown", 0.0
+    try:
+        out = ncii_guard.classify(prompt_text.strip())
+        label = str(out.get("label", "")).lower()
+        score = float(out.get("score", 0.0))
+        is_unsafe = (label == NCII_UNSAFE_LABEL) and (score >= NCII_THRESHOLD)
+        return is_unsafe, label, score
+    except Exception as e:
+        print(f"NCII guard inference error: {e}")
+        return False, "unknown", 0.0
+
+
 # ── LoRA Explorer Config ──────────────────────────────────────────────────────
 LORA_EXPLORER_CONFIG = [
     {
@@ -167,35 +198,6 @@ LORA_EXPLORER_CONFIG = [
         "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k"
     }
 ]
-
-# ── NCII safety guard (pure CPU subprocess, never touches spaces/CUDA) ──────
-NCII_UNSAFE_LABEL = "ncii"
-NCII_THRESHOLD = 0.5
-NCII_BLOCK_MESSAGE = "This prompt was flagged by the NCII content filter and was not processed. Please try again with a different prompt."
-
-print("Starting NCII safety guard subprocess (CPU-only)…")
-try:
-    ncii_guard.start()
-    print("NCII guard subprocess ready.")
-except Exception as e:
-    print(f"Warning: Could not start NCII guard subprocess: {e}")
-
-def check_ncii_safety(prompt_text):
-    """Ask the CPU-side subprocess. No GPU is requested by this call.
-
-    Returns: (is_unsafe: bool, label: str, score: float)
-    """
-    if not prompt_text or not prompt_text.strip():
-        return False, "unknown", 0.0
-    try:
-        out = ncii_guard.classify(prompt_text.strip())
-        label = str(out.get("label", "")).lower()
-        score = float(out.get("score", 0.0))
-        is_unsafe = (label == NCII_UNSAFE_LABEL) and (score >= NCII_THRESHOLD)
-        return is_unsafe, label, score
-    except Exception as e:
-        print(f"NCII guard inference error: {e}")
-        return False, "unknown", 0.0
 
 print(f"Loading {MODEL_ID} ...", flush=True)
 pipe = QwenImage21Pipeline.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16).to("cuda")
@@ -472,6 +474,7 @@ def check_safety(prompt: str) -> dict:
         return {"status": "blocked", "message": NCII_BLOCK_MESSAGE}
     return {"status": "ok", "label": label, "score": score}
 
+
 @app.mcp.tool(name="generate_image")
 @app.api(name="generate_image")
 def infer(
@@ -494,16 +497,12 @@ def infer(
     gc.collect()
     torch.cuda.empty_cache()
 
-    # ── Defense-in-depth NCII re-check inside the main API ──
+    # ── Defense-in-depth NCII re-check inside the GPU worker ──
     is_unsafe, _, _ = check_ncii_safety(prompt)
     if is_unsafe:
-        return {
-            "image": "",
-            "info": "blocked",
-            "seed": seed,
-            "status": "blocked",
-            "message": NCII_BLOCK_MESSAGE
-        }
+        gc.collect()
+        torch.cuda.empty_cache()
+        return {"image": "", "info": "", "seed": seed, "status": "blocked", "message": NCII_BLOCK_MESSAGE}
 
     image, info, used_seed = generate(
         prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
@@ -513,7 +512,8 @@ def infer(
     return {
         "image": pil_to_b64_png(image),
         "info": info,
-        "seed": used_seed
+        "seed": used_seed,
+        "status": "success"
     }
 
 @app.api(name="load_example", queue=False)
