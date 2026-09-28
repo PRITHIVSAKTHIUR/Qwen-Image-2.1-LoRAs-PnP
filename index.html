@@ -1182,6 +1182,19 @@ try {
     showToast('Could not connect to the backend API', 'error');
 }
 
+/* ── Safety Check ── */
+async function checkPromptSafety(prompt) {
+    if (!client) return { status: 'ok' };
+    try {
+        const result = await client.predict('/check_safety', { prompt });
+        const data = result.data && result.data[0];
+        return data || { status: 'ok' };
+    } catch (e) {
+        console.warn('Safety check failed, proceeding optimistically:', e);
+        return { status: 'ok' };
+    }
+}
+
 /* ── Run ── */
 function validateBeforeRun() {
     const promptVal = promptInput.value.trim();
@@ -1203,6 +1216,19 @@ async function runEdit() {
 
     setRunningUI(true);
     setViewMode('result');
+    showLoader('Checking prompt safety…');
+
+    const usedPrompt = promptInput.value;
+
+    // ── Step 1: CPU-only safety gate (no GPU requested yet) ──
+    const safety = await checkPromptSafety(usedPrompt);
+    if (safety && safety.status === 'blocked') {
+        hideLoader('Blocked', 'error');
+        showToast(safety.message || 'Request blocked by safety guard', 'warning');
+        setRunningUI(false);
+        return;
+    }
+
     showLoader('Submitting to queue…');
 
     let payloadImages = [...images];
@@ -1230,7 +1256,7 @@ async function runEdit() {
     }
 
     const payload = {
-        prompt: promptInput.value,
+        prompt: usedPrompt,
         negative_prompt: negPromptInput.value,
         images_b64_json: JSON.stringify(payloadImages.map(img => img.b64)),
         tier: tierSelect.value,
@@ -1287,6 +1313,9 @@ async function runEdit() {
                     hideLoader('Done', 'done');
                     showToast('Image generated successfully', 'info');
                     renderCanvas();
+                } else if (out && out.status === 'blocked') {
+                    hideLoader('Blocked', 'error');
+                    showToast(out.message || 'Request blocked by safety guard', 'warning');
                 } else {
                     hideLoader('Done', 'done');
                 }
