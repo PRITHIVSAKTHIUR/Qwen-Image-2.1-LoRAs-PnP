@@ -110,6 +110,14 @@ LORA_EXPLORER_CONFIG = [
         "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene."
     },
     {
+        "title": "Any Angle",
+        "repo": "lilylilith/QI_2.1_AnyAngle",
+        "weights": "QI2.1_AnyAngle.safetensors",
+        "cover": "LoRA_Cover/camera_angle_cover.png",
+        "images": ["examples/camera_angle_input_1.jpg", "examples/camera_angle_input_2.jpg"],
+        "prompt": "Change the camera angle from image 1 to image 2."
+    },
+    {
         "title": "Consistency LoRA",
         "repo": "ausboss/Qwen-Image-2.1-Consistency-LoRA",
         "weights": "qwen-image-2.1-consistency-2000.safetensors",
