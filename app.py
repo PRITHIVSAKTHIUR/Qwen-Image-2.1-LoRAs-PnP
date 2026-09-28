@@ -1,11 +1,3 @@
-"""Qwen-Image-2.1 demo for Hugging Face ZeroGPU.
-Text-to-image, multi-reference image editing, and native RGBA generation with a
-single `QwenImage21Pipeline`. The pipeline is placed on `cuda` at import time,
-which is how ZeroGPU makes the weights resident: CUDA is emulated outside
-`@spaces.GPU` and the runtime moves the tensors onto the real GPU when a
-decorated function is called.
-"""
-
 import os
 import gc
 import random
