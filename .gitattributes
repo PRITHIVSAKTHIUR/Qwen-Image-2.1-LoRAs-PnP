@@ -46,3 +46,4 @@ LoRA_Cover/faceswap_cover.png filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/objmv_cover.jpg filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/objmvT_cover.jpg filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/objrmT_cover.jpg filter=lfs diff=lfs merge=lfs -text
+LoRA_Cover/consistency_cover.png filter=lfs diff=lfs merge=lfs -text
