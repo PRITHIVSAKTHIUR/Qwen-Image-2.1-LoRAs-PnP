@@ -18,31 +18,9 @@ The system features dynamic lazy loading of pre-registered LoRAs (such as Viggle
 ### **Repository Structure**
 
 ```text
-├── assets/
-│   ├── Screenshot From 2026-09-24 09-58-52.png
-│   ├── Screenshot From 2026-09-24 10-17-31.png
-│   ├── Screenshot From 2026-09-24 10-19-56.png
-│   ├── Screenshot From 2026-09-24 10-38-22.png
-│   └── Screenshot From 2026-09-24 10-40-29.png
-├── examples/
-│   ├── anime_input.jpg
-│   ├── exposure_input.jpg
-│   ├── faceswap_input_1.jpeg
-│   ├── faceswap_input_2.jpeg
-│   ├── objmv_input.jpg
-│   ├── objmvT_input.jpg
-│   ├── objrm_input.jpg
-│   ├── objrmT_input.jpg
-│   └── outpaint_input.jpg
-├── LoRA_Cover/
-│   ├── anime_cover.png
-│   ├── exposure_cover.png
-│   ├── faceswap_cover.png
-│   ├── objmv_cover.jpg
-│   ├── objmvT_cover.jpg
-│   ├── objrm_cover.jpg
-│   ├── objrmT_cover.jpg
-│   └── outpaint_cover.jpg
+├── assets/...
+├── examples/...
+├── LoRA_Cover/...
 ├── app.py
 ├── index.html
 ├── LICENSE
