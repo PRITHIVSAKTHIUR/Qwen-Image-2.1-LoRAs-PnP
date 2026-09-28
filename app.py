@@ -110,6 +110,14 @@ LORA_EXPLORER_CONFIG = [
         "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene."
     },
     {
+        "title": "Consistency LoRA",
+        "repo": "ausboss/Qwen-Image-2.1-Consistency-LoRA",
+        "weights": "qwen-image-2.1-consistency-2000.safetensors",
+        "cover": "LoRA_Cover/consistency_cover.png",
+        "images": ["examples/consistency_input.jpeg"],
+        "prompt": "Transform the scene into a snowy winter day while preserving the original subject identity, framing, and composition."
+    },
+    {
         "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
         "weights": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
