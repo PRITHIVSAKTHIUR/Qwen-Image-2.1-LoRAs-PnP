@@ -824,6 +824,12 @@ function showToast(message, type) {
     toastTimer = setTimeout(() => toast.classList.remove('visible'), 3500);
 }
 
+function flashPromptError() {
+    promptInput.classList.add('error-flash');
+    promptInput.focus();
+    setTimeout(() => promptInput.classList.remove('error-flash'), 800);
+}
+
 function setStatus(text, cls) {
     sbStatus.textContent = text;
     sbStatus.className = 'sb-pill' + (cls ? ' ' + cls : '');
@@ -1182,19 +1188,6 @@ try {
     showToast('Could not connect to the backend API', 'error');
 }
 
-/* ── Safety Check ── */
-async function checkPromptSafety(prompt) {
-    if (!client) return { status: 'ok' };
-    try {
-        const result = await client.predict('/check_safety', { prompt });
-        const data = result.data && result.data[0];
-        return data || { status: 'ok' };
-    } catch (e) {
-        console.warn('Safety check failed, proceeding optimistically:', e);
-        return { status: 'ok' };
-    }
-}
-
 /* ── Run ── */
 function validateBeforeRun() {
     const promptVal = promptInput.value.trim();
@@ -1209,6 +1202,18 @@ function setRunningUI(on) {
     cancelBtn.style.display = on ? 'flex' : 'none';
 }
 
+async function checkPromptSafety(prompt) {
+    if (!client) return { status: 'ok' };
+    try {
+        const result = await client.predict('/check_safety', { prompt });
+        const data = result.data && result.data[0];
+        return data || { status: 'ok' };
+    } catch (e) {
+        console.warn('Safety check failed, proceeding optimistically:', e);
+        return { status: 'ok' };
+    }
+}
+
 async function runEdit() {
     if (running) return;
     if (!client) { showToast('Backend not connected', 'error'); return; }
@@ -1220,15 +1225,17 @@ async function runEdit() {
 
     const usedPrompt = promptInput.value;
 
-    // ── Step 1: CPU-only safety gate (no GPU requested yet) ──
+    /* ── Step 1: CPU-only safety gate (no GPU requested yet) ── */
     const safety = await checkPromptSafety(usedPrompt);
     if (safety && safety.status === 'blocked') {
         hideLoader('Blocked', 'error');
         showToast(safety.message || 'Request blocked by safety guard', 'warning');
+        flashPromptError();
         setRunningUI(false);
         return;
     }
 
+    /* ── Step 2: Only now do we ask the GPU worker to run ── */
     showLoader('Submitting to queue…');
 
     let payloadImages = [...images];
@@ -1256,7 +1263,7 @@ async function runEdit() {
     }
 
     const payload = {
-        prompt: usedPrompt,
+        prompt: promptInput.value,
         negative_prompt: negPromptInput.value,
         images_b64_json: JSON.stringify(payloadImages.map(img => img.b64)),
         tier: tierSelect.value,
@@ -1301,7 +1308,12 @@ async function runEdit() {
                 }
             } else if (msg.type === 'data') {
                 const out = msg.data && msg.data[0];
-                if (out && out.image) {
+                if (out && out.status === 'blocked') {
+                    /* Defense-in-depth re-check inside the GPU worker triggered */
+                    hideLoader('Blocked', 'error');
+                    showToast(out.message || 'Request blocked by safety guard', 'warning');
+                    flashPromptError();
+                } else if (out && out.image) {
                     currentResult = { b64: out.image, seed: out.seed };
                     infoTxt.value = out.info || '';
                     if (out.seed != null) {
@@ -1313,9 +1325,6 @@ async function runEdit() {
                     hideLoader('Done', 'done');
                     showToast('Image generated successfully', 'info');
                     renderCanvas();
-                } else if (out && out.status === 'blocked') {
-                    hideLoader('Blocked', 'error');
-                    showToast(out.message || 'Request blocked by safety guard', 'warning');
                 } else {
                     hideLoader('Done', 'done');
                 }
