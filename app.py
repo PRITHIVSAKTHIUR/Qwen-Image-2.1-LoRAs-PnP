@@ -170,8 +170,8 @@ LORA_EXPLORER_CONFIG = [
         "repo": "wesjos/Qwen-Image2.1-ZenlessZoneZero-Lora",
         "weights": "zzz_v1.4_step3000.safetensors",
         "cover": "LoRA_Cover/zen_less_input.png",
-        "images": [],
-        "prompt": "Lavender hair with cat-ear headband, purple tee, drinking from a paper cup."
+        "images": ["examples/zen_less_input1.jpg"],
+        "prompt": "Transform the image into a character with lavender hair, a cat-ear headband, and a purple tee, drinking from a paper cup. (zzz_style)"
     },
     {
         "title": "Object Remover (Turbo)",
