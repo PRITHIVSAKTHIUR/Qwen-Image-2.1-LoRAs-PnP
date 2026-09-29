@@ -170,7 +170,7 @@ LORA_EXPLORER_CONFIG = [
         "repo": "wesjos/Qwen-Image2.1-ZenlessZoneZero-Lora",
         "weights": "zzz_v1.4_step3000.safetensors",
         "cover": "LoRA_Cover/zen_less_input.png",
-        #"images": ["NONE"],
+        "images": [],
         "prompt": "Lavender hair with cat-ear headband, purple tee, drinking from a paper cup."
     },
     {
