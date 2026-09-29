@@ -166,6 +166,14 @@ LORA_EXPLORER_CONFIG = [
         "prompt": "Transform the scene into a snowy winter day while preserving the original subject identity, framing, and composition."
     },
     {
+        "title": "Zenless Zone 0",
+        "repo": "wesjos/Qwen-Image2.1-ZenlessZoneZero-Lora",
+        "weights": "zzz_v1.4_step3000.safetensors",
+        "cover": "LoRA_Cover/zen_less_input.png",
+        #"images": ["NONE"],
+        "prompt": "Lavender hair with cat-ear headband, purple tee, drinking from a paper cup."
+    },
+    {
         "title": "Object Remover (Turbo)",
         "repo": "prithivMLmods/Qwen-Image-2.1-Object-Remover-Bbox-turbo",
         "weights": "Qwen-Image-2.1-Object-Remover-Bbox-turbo-4000.safetensors",
