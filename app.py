@@ -142,6 +142,14 @@ LORA_EXPLORER_CONFIG = [
         "prompt": "Move the object highlighted in the red box to the location indicated by the other red box in the scene."
     },
     {
+        "title": "Doodle In",
+        "repo": "ML-Intern-lab/Qwen-Image-2.1-doodle-in-LoRA",
+        "weights": "doodle_in_lora_qwen21.safetensors",
+        "cover": "LoRA_Cover/doodle_in_cover.png",
+        "images": ["examples/doodle_in_input.png"],
+        "prompt": "Make the butterfly doodle look realistic."
+    },
+    {
         "title": "Any Angle",
         "repo": "lilylilith/QI_2.1_AnyAngle",
         "weights": "QI2.1_AnyAngle.safetensors",
