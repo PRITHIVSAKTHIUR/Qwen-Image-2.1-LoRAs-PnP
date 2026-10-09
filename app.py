@@ -218,7 +218,7 @@ LORA_EXPLORER_CONFIG = [
         "repo": "prithivMLmods/Qwen-Image-2.1-Voxel-Style",
         "weights": "Qwen-Image-2.1-Voxel-Style-3000.safetensors",
         "cover": "LoRA_Cover/voxel_cover.png",
-        "images": ["examples/voxel_input.png"],
+        "images": ["examples/voxel_input.jpg"],
         "prompt": "Transform the image into a voxel style."
     },
     {
