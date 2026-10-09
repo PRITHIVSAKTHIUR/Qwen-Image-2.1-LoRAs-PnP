@@ -91,10 +91,10 @@ pip install -r requirements.txt
 git+https://github.com/huggingface/diffusers.git
 torch==2.11.0
 torchvision==0.26.0
-transformers==5.17.0
+transformers==5.14.1
 accelerate==1.14.0
 peft==0.19.1
-gradio==6.28.0
+gradio==6.30.0
 av==17.1.0
 spaces>=0.51.1
 huggingface-hub>=1.24.0
@@ -116,6 +116,6 @@ Once the FastAPI web server initializes, open your browser to the local address 
 
 ### **License and Source**
 
-* **License:** [Qwen Research License Agreement](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP/blob/main/LICENSE?utm_source=gemini)
-* **GitHub Repository:** [https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git?utm_source=gemini)
-* **Hugging Face Live Space:** [https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP?utm_source=gemini)
+* **License:** [Qwen Research License Agreement](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP/blob/main/LICENSE)
+* **GitHub Repository:** [https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git](https://github.com/PRITHIVSAKTHIUR/Qwen-Image-2.1-LoRAs-PnP.git)
+* **Hugging Face Live Space:** [https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP](https://huggingface.co/spaces/prithivMLmods/Qwen-Image-2.1-LoRAs-PnP?)
