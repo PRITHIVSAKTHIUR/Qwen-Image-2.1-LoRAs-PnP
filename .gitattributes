@@ -58,3 +58,4 @@ LoRA_Cover/voxel_cover.png filter=lfs diff=lfs merge=lfs -text
 examples/voxel_input.jpg filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/clay_cover.png filter=lfs diff=lfs merge=lfs -text
 examples/clay_input.jpg filter=lfs diff=lfs merge=lfs -text
+LoRA_Cover/amethyst_cover.png filter=lfs diff=lfs merge=lfs -text
