@@ -54,3 +54,4 @@ LoRA_Cover/doodle_in_cover.png filter=lfs diff=lfs merge=lfs -text
 examples/doodle_in_input.png filter=lfs diff=lfs merge=lfs -text
 LoRA_Cover/zen_less_input.png filter=lfs diff=lfs merge=lfs -text
 examples/zen_less_input1.jpg filter=lfs diff=lfs merge=lfs -text
+LoRA_Cover/voxel_cover.png filter=lfs diff=lfs merge=lfs -text
