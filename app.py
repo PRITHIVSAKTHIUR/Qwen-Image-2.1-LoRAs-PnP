@@ -220,7 +220,15 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/voxel_cover.png",
         "images": ["examples/voxel_input.png"],
         "prompt": "Transform the image into a voxel style."
-    },    
+    },
+    {
+        "title": "Clay",
+        "repo": "prithivMLmods/Qwen-Image-2.1-Clay-Sculpture-Style",
+        "weights": "Qwen-Image-2.1-Clay-Sculpture-Style-3000.safetensors",
+        "cover": "LoRA_Cover/clay_cover.png",
+        "images": ["examples/clay_input.jpg"],
+        "prompt": "Transform the image into a clay sculpture style."
+    },     
 ]
 
 print(f"Loading {MODEL_ID} ...", flush=True)
