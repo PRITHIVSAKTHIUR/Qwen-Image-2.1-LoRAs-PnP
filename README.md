@@ -73,7 +73,7 @@ uv run app.py
 Upgrade your local package manager:
 
 ```bash
-pip install "pip>=26.2.1"
+pip install "pip==26.2.1"
 ```
 
 **2. Install Core Dependencies**
