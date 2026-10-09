@@ -228,7 +228,16 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/clay_cover.png",
         "images": ["examples/clay_input.jpg"],
         "prompt": "Transform the image into a clay sculpture style."
-    },     
+    },
+    {
+        "title": "Amethyst",
+        "repo": "prithivMLmods/Qwen-Image-2.1-Amethyst-Theme",
+        "weights": "Qwen-Image-2.1-Amethyst-Theme-3000.safetensors",
+        "cover": "LoRA_Cover/amethyst_cover.png",
+        "images": ["examples/amethyst_input.jpeg"],
+        "prompt": "Apply an amethyst theme to the image."
+    },  
+    
 ]
 
 print(f"Loading {MODEL_ID} ...", flush=True)
