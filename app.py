@@ -242,7 +242,7 @@ LORA_EXPLORER_CONFIG = [
         "repo": "prithivMLmods/Qwen-Image-2.1-Outrun",
         "weights": "Qwen-Image-2.1-Outrun-3000.safetensors",
         "cover": "LoRA_Cover/outrun_cover.png",
-        "images": ["examples/outrun_input.jpeg"],
+        "images": ["examples/outrun_input.jpg"],
         "prompt": "Transform the image into an outrun theme."
     },
     {
