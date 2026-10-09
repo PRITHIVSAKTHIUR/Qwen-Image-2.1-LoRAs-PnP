@@ -236,8 +236,15 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/amethyst_cover.png",
         "images": ["examples/amethyst_input.jpeg"],
         "prompt": "Apply an amethyst theme to the image."
-    },  
-    
+    },
+    {
+        "title": "Outrun",
+        "repo": "prithivMLmods/Qwen-Image-2.1-Outrun",
+        "weights": "Qwen-Image-2.1-Outrun-3000.safetensors",
+        "cover": "LoRA_Cover/outrun_cover.png",
+        "images": ["examples/outrun_input.jpeg"],
+        "prompt": "Transform the image into an outrun theme."
+    },     
 ]
 
 print(f"Loading {MODEL_ID} ...", flush=True)
