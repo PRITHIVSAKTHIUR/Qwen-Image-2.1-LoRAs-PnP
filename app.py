@@ -212,7 +212,15 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/faceswap_cover.png",
         "images": ["examples/faceswap_input_1.jpeg", "examples/faceswap_input_2.jpeg"],
         "prompt": "head_swap: start with <image1> as the base image, keeping its lighting, environment, and background. remove the head from <image1> completely and replace it with the head from <image2>, strictly preserving the hair, eye color, nose structure from <image2>. copy the direction of the eye, head rotation, micro expressions from <image1>, high quality, sharp details, 4k"
-    }
+    },
+    {
+        "title": "Voxel-Style",
+        "repo": "prithivMLmods/Qwen-Image-2.1-Voxel-Style",
+        "weights": "Qwen-Image-2.1-Voxel-Style-3000.safetensors",
+        "cover": "LoRA_Cover/voxel_cover.png",
+        "images": ["examples/voxel_input.png"],
+        "prompt": "Transform the image into a voxel style."
+    },    
 ]
 
 print(f"Loading {MODEL_ID} ...", flush=True)
