@@ -244,7 +244,15 @@ LORA_EXPLORER_CONFIG = [
         "cover": "LoRA_Cover/outrun_cover.png",
         "images": ["examples/outrun_input.jpeg"],
         "prompt": "Transform the image into an outrun theme."
-    },     
+    },
+    {
+        "title": "Heatwave",
+        "repo": "prithivMLmods/Qwen-Image-2.1-Heatwave",
+        "weights": "Qwen-Image-2.1-Heatwave-3000.safetensors",
+        "cover": "LoRA_Cover/heatwave_cover.png",
+        "images": ["examples/heatwave_input.jpg"],
+        "prompt": "Apply a heatwave theme to the image."
+    },
 ]
 
 print(f"Loading {MODEL_ID} ...", flush=True)
