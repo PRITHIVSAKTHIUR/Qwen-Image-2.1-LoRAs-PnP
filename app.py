@@ -13,7 +13,8 @@ tracked per-pipeline, so any LoRA can be attached to either pipeline.
 
 When using the "Custom LoRA" mode the user can additionally choose whether to
 run on the base pipeline (native 40 steps) or on the native turbo pipeline
-(8 steps). The default for that toggle is the 8-step turbo pipeline.
+(8 steps). The default for that toggle (set in the UI) is the 8-step turbo
+pipeline.
 """
 
 import os
@@ -476,7 +477,7 @@ def _gpu_duration_func(
     return int(gpu_duration)
 
 
-@spaces.GPU(duration=_gpu_duration_func, size="xlarge")
+@spaces.GPU(duration=_gpu_duration_func)
 def _generate(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
     negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo, gpu_duration
