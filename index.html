@@ -758,7 +758,7 @@ body{
           <span class="slider-val" id="custom-gpu-dur-val">45s</span>
         </div>
         <div class="note-text">
-            Note: 4-Step Turbo → 30 secs. 8-Step Native Turbo (or Custom LoRA + Turbo) → 45+ secs. Base + LoRA → 90+ secs.
+            Note: 4-Step Turbo → 30 secs. 8-Step Native Turbo (or Custom LoRA + Turbo) → 45+ secs. 40-Step (or Custom LoRA + base) → 90+ secs.
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="custom-transparent">
@@ -1189,10 +1189,20 @@ function lockSteps(val) {
     stepsVal.textContent = val;
     stepsSlider.disabled = true;
 }
+function setSteps(val) {
+    stepsSlider.value = val;
+    stepsVal.textContent = val;
+    stepsSlider.disabled = false;
+}
 function lockCfg(val) {
     cfgSlider.value = val;
     cfgVal.textContent = val.toFixed(1);
     cfgSlider.disabled = true;
+}
+function setCfg(val) {
+    cfgSlider.value = val;
+    cfgVal.textContent = val.toFixed(1);
+    cfgSlider.disabled = false;
 }
 function setGpuDur(val) {
     gpuDurSl.value = val;
@@ -1209,6 +1219,18 @@ function lockForTurbo(steps, gpuSecs) {
     negPromptInput.disabled = true;
     setGpuDur(gpuSecs);
 }
+/* "40-Step" preset: unlock the steps/CFG/negative prompt (so the user can
+   still fine-tune), but auto-set steps to 40, CFG to 1.0, and GPU to 90s —
+   symmetric with the 4-Step / 8-Step turbo presets. */
+function set40StepDefaults() {
+    unlockStepsCfg();
+    setSteps(40);
+    setCfg(1.0);
+    const cur = parseInt(gpuDurSl.value);
+    if (cur === 30 || cur === 45) {
+        setGpuDur(90);
+    }
+}
 
 /* ── Custom-LoRA pipeline toggle ── */
 function syncCustomPipeToggle() {
@@ -1224,13 +1246,7 @@ function applyCustomPipeChoice() {
         lockForTurbo(8, 45);
     } else {
         /* Native 40 steps on the base pipeline */
-        unlockStepsCfg();
-        stepsSlider.value = 40; stepsVal.textContent = 40;
-        cfgSlider.value = 1.0;  cfgVal.textContent = '1.0';
-        const cur = parseInt(gpuDurSl.value);
-        if (cur === 30 || cur === 45) {
-            setGpuDur(90);
-        }
+        set40StepDefaults();
     }
 }
 
@@ -1258,11 +1274,10 @@ loraSelect.addEventListener('change', (e) => {
     } else if (isCustom) {
         applyCustomPipeChoice();
     } else {
-        unlockStepsCfg();
-        const cur = parseInt(gpuDurSl.value);
-        if (cur === 30 || cur === 45) {
-            setGpuDur(90);
-        }
+        /* "40-Step (no LoRA)" and all other LoRA presets (Object Mover,
+           Object Remover, Natural Exposure, Face Swap) — auto-set the steps
+           slider to 40, mirroring the 4-Step / 8-Step turbo presets. */
+        set40StepDefaults();
     }
 });
 
