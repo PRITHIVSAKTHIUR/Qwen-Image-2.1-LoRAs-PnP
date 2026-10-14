@@ -368,6 +368,60 @@ body{
 .custom-lora-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,144,255,.15)}
 .custom-lora-input::placeholder{color:var(--faint)}
 
+/* Pipeline radio toggle (for custom LoRA mode) */
+.pipe-toggle-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+}
+.pipe-toggle-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.pipe-toggle {
+    display: flex;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 3px;
+    gap: 3px;
+}
+.pipe-toggle-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all .15s;
+    text-align: center;
+    line-height: 1.3;
+}
+.pipe-toggle-btn:hover:not(.active) { color: var(--text); }
+.pipe-toggle-btn.active {
+    background: rgba(30, 144, 255, .18);
+    color: var(--accent2);
+    box-shadow: inset 0 0 0 1px rgba(30, 144, 255, .35);
+}
+.pipe-toggle-btn .pipe-sub {
+    display: block;
+    font-size: 9px;
+    font-weight: 500;
+    color: var(--faint);
+    margin-top: 2px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+.pipe-toggle-btn.active .pipe-sub { color: var(--accent3); }
+
 .note-text {
     font-size: 10px; color: var(--faint); margin-top: -4px; margin-bottom: 12px; 
     font-family: 'Inter', sans-serif; line-height: 1.4;
@@ -620,8 +674,9 @@ body{
       <div class="insp-section">
         <div class="insp-section-title"><span>Mode & Resolution</span></div>
         <select id="custom-lora-select" class="lora-native-select">
-            <option value="None (no LoRA)">None (no LoRA)</option>
+            <option value="40-Step (no LoRA)">40-Step (no LoRA)</option>
             <option value="4-Step Turbo (Viggle)">4-Step Turbo (Viggle)</option>
+            <option value="8-Step Turbo (Native Qwen)" selected>8-Step Turbo (Native Qwen)</option>
             <option value="Object Mover (prithivMLmods)">Object Mover (prithivMLmods)</option>
             <option value="Object Remover (prithivMLmods)">Object Remover (prithivMLmods)</option>
             <option value="Natural Exposure (prithivMLmods)">Natural Exposure (prithivMLmods)</option>
@@ -631,9 +686,23 @@ body{
         <div class="custom-lora-group" id="custom-lora-group">
             <input type="text" id="custom-lora-repo" class="custom-lora-input" placeholder="Custom LoRA repo id (e.g. user/repo)">
             <input type="text" id="custom-lora-weight" class="custom-lora-input" placeholder="Weight file name (optional)">
+
+            <div class="pipe-toggle-wrap">
+                <div class="pipe-toggle-label">Run on which pipeline?</div>
+                <div class="pipe-toggle" id="custom-pipe-toggle">
+                    <button type="button" class="pipe-toggle-btn" data-pipe="base">
+                        Native 40 Steps
+                        <span class="pipe-sub">Qwen-Image-2.1 base</span>
+                    </button>
+                    <button type="button" class="pipe-toggle-btn active" data-pipe="turbo">
+                        8-Step Turbo
+                        <span class="pipe-sub">Qwen-Image-2.1-Turbo</span>
+                    </button>
+                </div>
+            </div>
         </div>
         <div class="pnp-note">
-            *Choose the Custom LoRA for Plug and Play (any LoRA based on Qwen Image 2.1)
+            *Choose the Custom LoRA for Plug and Play (any LoRA based on Qwen Image 2.1). You can run it on the base pipeline (native 40 steps) or the native Turbo pipeline (8 steps). Default is 8-Step Turbo.
         </div>
         <select id="custom-tier" class="lora-native-select">
             <option value="1K (fast)">1K (fast)</option>
@@ -675,27 +744,27 @@ body{
         </div>
         <div class="slider-row">
           <label>Steps</label>
-          <input type="range" id="custom-steps" min="1" max="50" step="1" value="40">
-          <span class="slider-val" id="custom-steps-val">40</span>
+          <input type="range" id="custom-steps" min="1" max="50" step="1" value="8" disabled>
+          <span class="slider-val" id="custom-steps-val">8</span>
         </div>
         <div class="slider-row">
           <label>CFG</label>
-          <input type="range" id="custom-cfg" min="1.0" max="4.0" step="0.1" value="1.0">
+          <input type="range" id="custom-cfg" min="1.0" max="4.0" step="0.1" value="1.0" disabled>
           <span class="slider-val" id="custom-cfg-val">1.0</span>
         </div>
         <div class="slider-row">
           <label>GPU (s)</label>
-          <input type="range" id="custom-gpu-dur" min="30" max="180" step="30" value="90">
-          <span class="slider-val" id="custom-gpu-dur-val">90s</span>
+          <input type="range" id="custom-gpu-dur" min="30" max="180" step="30" value="45">
+          <span class="slider-val" id="custom-gpu-dur-val">45s</span>
         </div>
         <div class="note-text">
-            Note: If using 4-Step Turbo, adjust the slider to 30 secs.
+            Note: 4-Step Turbo → 30 secs. 8-Step Native Turbo (or Custom LoRA + Turbo) → 45+ secs. Base + LoRA → 90+ secs.
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="custom-transparent">
           <label for="custom-transparent">Transparent background (RGBA)</label>
         </div>
-        <textarea id="custom-neg-prompt" class="modern-textarea" rows="2" style="margin-top:8px;" placeholder="Negative prompt (used only when CFG > 1)"></textarea>
+        <textarea id="custom-neg-prompt" class="modern-textarea" rows="2" style="margin-top:8px;" placeholder="Negative prompt (used only when CFG > 1)" disabled></textarea>
       </div>
       
       <div class="insp-section">
@@ -715,6 +784,7 @@ body{
     <div class="sb-section" id="sb-image-count">No inputs</div>
     <div class="sb-right">
       <a class="sb-link" href="https://huggingface.co/Qwen/Qwen-Image-2.1" target="_blank" rel="noopener">Qwen-Image-2.1</a>
+      <a class="sb-link" href="https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo" target="_blank" rel="noopener">+ Turbo</a>
       <span class="sb-pill" id="sb-status">Ready</span>
     </div>
   </div>
@@ -739,6 +809,7 @@ const loraSelect   = document.getElementById('custom-lora-select');
 const customLoraGroup = document.getElementById('custom-lora-group');
 const customRepoInput = document.getElementById('custom-lora-repo');
 const customWeightInput = document.getElementById('custom-lora-weight');
+const customPipeToggle = document.getElementById('custom-pipe-toggle');
 const tierSelect   = document.getElementById('custom-tier');
 const aspectSelect = document.getElementById('custom-aspect');
 const runBtn       = document.getElementById('custom-run-btn');
@@ -795,6 +866,8 @@ let running = false;
 let currentJob = null;
 let currentResult = null;
 let viewMode = 'result';
+/* Default for the Custom-LoRA pipeline toggle is the 8-step native turbo pipe. */
+let customPipeChoice = 'turbo';
 
 let bboxes = [];
 let undoStack = [];
@@ -1110,27 +1183,85 @@ document.getElementById('dice-btn').addEventListener('click', () => {
 
 promptInput.addEventListener('input', () => charCount.textContent = promptInput.value.length);
 
+/* ── Slider lock helpers ── */
+function lockSteps(val) {
+    stepsSlider.value = val;
+    stepsVal.textContent = val;
+    stepsSlider.disabled = true;
+}
+function lockCfg(val) {
+    cfgSlider.value = val;
+    cfgVal.textContent = val.toFixed(1);
+    cfgSlider.disabled = true;
+}
+function setGpuDur(val) {
+    gpuDurSl.value = val;
+    gpuDurVal.textContent = val + 's';
+}
+function unlockStepsCfg() {
+    stepsSlider.disabled = false;
+    cfgSlider.disabled = false;
+    negPromptInput.disabled = false;
+}
+function lockForTurbo(steps, gpuSecs) {
+    lockSteps(steps);
+    lockCfg(1.0);
+    negPromptInput.disabled = true;
+    setGpuDur(gpuSecs);
+}
+
+/* ── Custom-LoRA pipeline toggle ── */
+function syncCustomPipeToggle() {
+    customPipeToggle.querySelectorAll('.pipe-toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.pipe === customPipeChoice);
+    });
+}
+
+function applyCustomPipeChoice() {
+    /* Only meaningful when the user has actually selected Custom LoRA mode */
+    if (loraSelect.value !== 'Custom LoRA (enter repo below)') return;
+    if (customPipeChoice === 'turbo') {
+        lockForTurbo(8, 45);
+    } else {
+        /* Native 40 steps on the base pipeline */
+        unlockStepsCfg();
+        stepsSlider.value = 40; stepsVal.textContent = 40;
+        cfgSlider.value = 1.0;  cfgVal.textContent = '1.0';
+        const cur = parseInt(gpuDurSl.value);
+        if (cur === 30 || cur === 45) {
+            setGpuDur(90);
+        }
+    }
+}
+
+customPipeToggle.querySelectorAll('.pipe-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        customPipeChoice = btn.dataset.pipe;
+        syncCustomPipeToggle();
+        applyCustomPipeChoice();
+    });
+});
+
 /* ── Mode Change Logic ── */
 loraSelect.addEventListener('change', (e) => {
     const mode = e.target.value;
     const isCustom = mode === "Custom LoRA (enter repo below)";
     const isTurbo = mode === "4-Step Turbo (Viggle)";
+    const isNativeTurbo = mode === "8-Step Turbo (Native Qwen)";
     
     customLoraGroup.style.display = isCustom ? 'flex' : 'none';
     
     if (isTurbo) {
-        stepsSlider.value = 4; stepsVal.textContent = 4;
-        stepsSlider.disabled = true;
-        cfgSlider.value = 1.0; cfgVal.textContent = '1.0';
-        cfgSlider.disabled = true;
-        negPromptInput.disabled = true;
-        gpuDurSl.value = 30; gpuDurVal.textContent = '30s';
+        lockForTurbo(4, 30);
+    } else if (isNativeTurbo) {
+        lockForTurbo(8, 45);
+    } else if (isCustom) {
+        applyCustomPipeChoice();
     } else {
-        stepsSlider.disabled = false;
-        cfgSlider.disabled = false;
-        negPromptInput.disabled = false;
-        if (parseInt(gpuDurSl.value) === 30) {
-            gpuDurSl.value = 90; gpuDurVal.textContent = '90s';
+        unlockStepsCfg();
+        const cur = parseInt(gpuDurSl.value);
+        if (cur === 30 || cur === 45) {
+            setGpuDur(90);
         }
     }
 });
@@ -1276,6 +1407,7 @@ async function runEdit() {
         mode: loraSelect.value,
         custom_lora_repo: customRepoInput.value,
         custom_lora_weight: customWeightInput.value,
+        custom_use_turbo: customPipeChoice === 'turbo',
         gpu_duration: parseInt(gpuDurSl.value),
     };
 
@@ -1381,8 +1513,10 @@ async function loadExplorerCard(card, idx) {
         if (data && data.status === 'ok' && data.images && data.images.length > 0) {
             clearAll();
             
-            // Set to custom LoRA
+            // Set to custom LoRA, default to 8-step Turbo (native turbo pipeline)
             loraSelect.value = "Custom LoRA (enter repo below)";
+            customPipeChoice = 'turbo';
+            syncCustomPipeToggle();
             loraSelect.dispatchEvent(new Event('change'));
             customRepoInput.value = data.repo;
             customWeightInput.value = data.weights;
@@ -1433,6 +1567,13 @@ async function initExplorer() {
         console.error('Failed to initialize LoRA Explorer:', e);
     }
 }
+
+/* ── Initial page-load sync ──
+   The default selected mode is "8-Step Turbo (Native Qwen)", so the steps/CFG
+   sliders must reflect the locked 8/1.0/45s state on first paint. */
+syncCustomPipeToggle();
+/* Fire the change handler once so the slider locks match the default mode. */
+loraSelect.dispatchEvent(new Event('change'));
 
 initExplorer();
 renderFilmstrip();
