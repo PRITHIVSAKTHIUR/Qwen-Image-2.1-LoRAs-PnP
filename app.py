@@ -1,9 +1,19 @@
 """Qwen-Image-2.1 demo for Hugging Face ZeroGPU.
-Text-to-image, multi-reference image editing, and native RGBA generation with a
-single `QwenImage21Pipeline`. The pipeline is placed on `cuda` at import time,
-which is how ZeroGPU makes the weights resident: CUDA is emulated outside
-`@spaces.GPU` and the runtime moves the tensors onto the real GPU when a
-decorated function is called.
+
+Text-to-image, multi-reference image editing, and native RGBA generation with
+`QwenImage21Pipeline`. Two pipelines are resident at import time:
+
+  * `pipe`               — base `Qwen/Qwen-Image-2.1`
+  * `turbo_native_pipe`  — `Qwen/Qwen-Image-2.1-Turbo` (8-step distilled)
+
+Both are placed on `cuda` at import time so ZeroGPU makes the weights resident;
+CUDA is emulated outside `@spaces.GPU` and the runtime moves tensors onto the
+real GPU when a decorated function is called. LoRAs are loaded lazily and
+tracked per-pipeline, so any LoRA can be attached to either pipeline.
+
+When using the "Custom LoRA" mode the user can additionally choose whether to
+run on the base pipeline (native 40 steps) or on the native turbo pipeline
+(8 steps). The default for that toggle is the 8-step turbo pipeline.
 """
 
 import os
@@ -25,10 +35,12 @@ from diffusers import FlowMatchEulerDiscreteScheduler, QwenImage21Pipeline
 import ncii_guard
 
 MODEL_ID = os.environ.get("MODEL_ID", "Qwen/Qwen-Image-2.1")
+TURBO_NATIVE_REPO = os.environ.get("TURBO_NATIVE_REPO", "Qwen/Qwen-Image-2.1-Turbo")
 TURBO_REPO = os.environ.get("TURBO_REPO", "Viggle/Qwen-Image-2.1-viggle-turbo")
 TURBO_LORA_FILE = "Qwen-Image-2.1-viggle-turbo-4step-lora-r64.safetensors"
 TURBO_ADAPTER_NAME = "turbo"
 TURBO_STEPS = 4
+TURBO_NATIVE_STEPS = 8
 HF_TOKEN = os.environ.get("HF_TOKEN")
 
 OBJECT_MOVER_REPO = "prithivMLmods/Qwen-Image-2.1-Object-Mover-Bbox-Preview"
@@ -50,15 +62,25 @@ FACE_SWAP_ALISSON_ADAPTER = "face_swap_alisson"
 MAX_SEED = np.iinfo(np.int32).max
 MAX_REF_IMAGES = 10
 
-DEFAULT_MODE = "None (no LoRA)"
+DEFAULT_MODE = "40-Step (no LoRA)"
 TURBO_MODE = "4-Step Turbo (Viggle)"
+TURBO_NATIVE_MODE = "8-Step Turbo (Native Qwen)"
 OBJECT_MOVER_MODE = "Object Mover (prithivMLmods)"
 OBJECT_REMOVER_MODE = "Object Remover (prithivMLmods)"
 NATURAL_EXPOSURE_MODE = "Natural Exposure (prithivMLmods)"
 FACE_SWAP_ALISSON_MODE = "Face Swap (Alissonerdx)"
 CUSTOM_MODE = "Custom LoRA (enter repo below)"
 
-MODE_CHOICES = [DEFAULT_MODE, TURBO_MODE, OBJECT_MOVER_MODE, OBJECT_REMOVER_MODE, NATURAL_EXPOSURE_MODE, FACE_SWAP_ALISSON_MODE, CUSTOM_MODE]
+MODE_CHOICES = [
+    DEFAULT_MODE,
+    TURBO_MODE,
+    TURBO_NATIVE_MODE,
+    OBJECT_MOVER_MODE,
+    OBJECT_REMOVER_MODE,
+    NATURAL_EXPOSURE_MODE,
+    FACE_SWAP_ALISSON_MODE,
+    CUSTOM_MODE,
+]
 
 LORA_PRESETS = {
     TURBO_MODE: (TURBO_REPO, TURBO_LORA_FILE, TURBO_ADAPTER_NAME),
@@ -255,52 +277,98 @@ LORA_EXPLORER_CONFIG = [
     },
 ]
 
+# ══ Pipeline loading ════════════════════════════════════════════════════════
 print(f"Loading {MODEL_ID} ...", flush=True)
-pipe = QwenImage21Pipeline.from_pretrained(MODEL_ID, torch_dtype=torch.bfloat16).to("cuda")
-print("Pipeline loaded.", flush=True)
+pipe = QwenImage21Pipeline.from_pretrained(
+    MODEL_ID, torch_dtype=torch.bfloat16
+).to("cuda")
+print("Base pipeline loaded.", flush=True)
 
-print(f"Loading turbo LoRA from {TURBO_REPO} ...", flush=True)
+print(f"Loading native Turbo model {TURBO_NATIVE_REPO} ...", flush=True)
+turbo_native_pipe = QwenImage21Pipeline.from_pretrained(
+    TURBO_NATIVE_REPO, torch_dtype=torch.bfloat16
+).to("cuda")
+print("Native Turbo pipeline loaded.", flush=True)
+
+print(f"Loading 4-step turbo LoRA from {TURBO_REPO} ...", flush=True)
 pipe.load_lora_weights(
     TURBO_REPO, weight_name=TURBO_LORA_FILE, adapter_name=TURBO_ADAPTER_NAME, token=HF_TOKEN,
 )
 pipe.disable_lora()
-print("Turbo LoRA loaded (inactive).", flush=True)
+print("4-step turbo LoRA loaded (inactive).", flush=True)
 
-_LOADED_ADAPTERS = {TURBO_ADAPTER_NAME}
+# Per-pipeline adapter registries (same LoRA can be loaded on each pipe).
+_LOADED_ADAPTERS = {TURBO_ADAPTER_NAME}            # on `pipe`
+_LOADED_ADAPTERS_TURBO_NATIVE = set()             # on `turbo_native_pipe`
 
 default_scheduler = pipe.scheduler
-turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_config(pipe.scheduler.config, shift_terminal=None)
+turbo_scheduler = FlowMatchEulerDiscreteScheduler.from_config(
+    pipe.scheduler.config, shift_terminal=None
+)
+# Native turbo's own scheduler — used as-is (it's already configured for 8-step
+# distillation).
+turbo_native_scheduler = turbo_native_pipe.scheduler
 
-patch_embed = pipe.text_encoder.model.visual.patch_embed
 
-def _patch_embed_forward(hidden_states):
-    proj = patch_embed.proj
+# ══ Monkey-patch patch_embed on both text encoders (diffusers workaround) ══
+def _make_patch_embed_forward(patch_embed_module):
+    proj = patch_embed_module.proj
     weight = proj.weight.reshape(proj.weight.shape[0], -1)
-    return hidden_states.to(weight.dtype).flatten(1) @ weight.T + proj.bias
+    bias = proj.bias
 
-patch_embed.forward = _patch_embed_forward
+    def _forward(hidden_states):
+        return hidden_states.to(weight.dtype).flatten(1) @ weight.T + bias
+
+    return _forward
+
+
+pipe.text_encoder.model.visual.patch_embed.forward = _make_patch_embed_forward(
+    pipe.text_encoder.model.visual.patch_embed
+)
+turbo_native_pipe.text_encoder.model.visual.patch_embed.forward = _make_patch_embed_forward(
+    turbo_native_pipe.text_encoder.model.visual.patch_embed
+)
+
 
 def _custom_adapter_name(repo, weight_name):
     key = f"{repo}::{weight_name or ''}"
     return "custom_" + str(abs(hash(key)) % 10_000_000)
 
-def _ensure_lora_loaded(adapter_name, repo, weight_name):
-    if adapter_name in _LOADED_ADAPTERS:
+
+def _ensure_lora_loaded(adapter_name, repo, weight_name, target_pipe=None):
+    """Lazy-load a LoRA onto `target_pipe` (defaults to base `pipe`).
+
+    Each pipeline keeps its own adapter registry: the same LoRA can be loaded
+    independently on the base pipe and on the native turbo pipe.
+    """
+    if target_pipe is None:
+        target_pipe = pipe
+    loaded_set = (
+        _LOADED_ADAPTERS_TURBO_NATIVE if target_pipe is turbo_native_pipe else _LOADED_ADAPTERS
+    )
+    if adapter_name in loaded_set:
         return
-    print(f"Lazily loading LoRA '{adapter_name}' from {repo} ...", flush=True)
+    print(
+        f"Lazily loading LoRA '{adapter_name}' on "
+        f"{'turbo_native' if target_pipe is turbo_native_pipe else 'base'} from {repo} ...",
+        flush=True,
+    )
     try:
-        pipe.load_lora_weights(
+        target_pipe.load_lora_weights(
             repo, weight_name=weight_name or None, adapter_name=adapter_name, token=HF_TOKEN,
         )
     except Exception as exc:
         raise gr.Error(f"Could not load LoRA from '{repo}': {exc}") from exc
-    _LOADED_ADAPTERS.add(adapter_name)
+    loaded_set.add(adapter_name)
     print(f"LoRA '{adapter_name}' loaded.", flush=True)
+
 
 def _needs_full_gpu(output_resolution, references):
     return int(output_resolution) >= 2048 and bool(references)
 
+
 _TEXT_ENCODER_EVICTION = {"armed": False}
+
 
 def _vram_note(stage):
     free, total = torch.cuda.mem_get_info()
@@ -311,36 +379,68 @@ def _vram_note(stage):
         flush=True,
     )
 
+
 def _release_text_encoder(module, args):
+    """Evict whichever pipeline's text encoder is currently resident on CUDA."""
     if _TEXT_ENCODER_EVICTION["armed"]:
         _TEXT_ENCODER_EVICTION["armed"] = False
-        pipe.text_encoder.to("cpu")
+        for p in (pipe, turbo_native_pipe):
+            try:
+                if next(p.text_encoder.parameters()).device.type == "cuda":
+                    p.text_encoder.to("cpu")
+            except Exception:
+                pass
         torch.cuda.empty_cache()
         _vram_note("after text encoder eviction")
 
-for component in (pipe.vae, pipe.transformer):
+
+for component in (
+    pipe.vae, pipe.transformer,
+    turbo_native_pipe.vae, turbo_native_pipe.transformer,
+):
     component.register_forward_pre_hook(_release_text_encoder)
+
 
 def _run_pipeline(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora
+    negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo
 ):
-    if lora:
-        _ensure_lora_loaded(lora["adapter_name"], lora["repo"], lora.get("weight_name"))
-        pipe.enable_lora()
-        pipe.set_adapters([lora["adapter_name"]], adapter_weights=[1.0])
-    else:
-        pipe.disable_lora()
-    pipe.scheduler = turbo_scheduler if turbo else default_scheduler
+    active_pipe = turbo_native_pipe if use_native_turbo else pipe
 
-    encoder_device = next(pipe.text_encoder.parameters()).device
+    if lora:
+        _ensure_lora_loaded(
+            lora["adapter_name"], lora["repo"], lora.get("weight_name"),
+            target_pipe=active_pipe,
+        )
+        active_pipe.enable_lora()
+        active_pipe.set_adapters([lora["adapter_name"]], adapter_weights=[1.0])
+    else:
+        active_pipe.disable_lora()
+
+    if use_native_turbo:
+        # The native turbo pipeline's scheduler is already configured for the
+        # distilled 8-step trajectory — leave it alone.
+        active_pipe.scheduler = turbo_native_scheduler
+    else:
+        active_pipe.scheduler = turbo_scheduler if turbo else default_scheduler
+
+    encoder_device = next(active_pipe.text_encoder.parameters()).device
     if encoder_device.type != "cuda":
-        pipe.text_encoder.to("cuda")
+        active_pipe.text_encoder.to("cuda")
     _TEXT_ENCODER_EVICTION["armed"] = True
     torch.cuda.reset_peak_memory_stats()
     lora_tag = lora["adapter_name"] if lora else "none"
+    if use_native_turbo:
+        pipe_tag = "turbo_native+custom_lora" if lora else "turbo_native"
+    else:
+        if turbo:
+            pipe_tag = "base+turbo_lora"
+        elif lora:
+            pipe_tag = "base+custom_lora"
+        else:
+            pipe_tag = "base"
     _vram_note(
-        f"start {output_resolution}px, lora={lora_tag}, turbo={turbo}, "
+        f"start {output_resolution}px, pipe={pipe_tag}, lora={lora_tag}, "
         f"text encoder was on {encoder_device}"
     )
 
@@ -362,37 +462,41 @@ def _run_pipeline(
         kwargs["true_cfg_scale"] = float(guidance_scale)
 
     try:
-        image = pipe(**kwargs).images[0]
+        image = active_pipe(**kwargs).images[0]
         _vram_note("end of pipeline call")
         return image
     finally:
         _TEXT_ENCODER_EVICTION["armed"] = False
 
+
 def _gpu_duration_func(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo, gpu_duration
 ):
     return int(gpu_duration)
 
-@spaces.GPU(duration=_gpu_duration_func)
+
+@spaces.GPU(duration=_gpu_duration_func, size="xlarge")
 def _generate(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
-        negative_prompt, guidance_scale, seed, turbo, lora
+        negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo
     )
+
 
 @spaces.GPU(duration=_gpu_duration_func, size="xlarge")
 def _generate_full_gpu(
     prompt, pil_references, width, height, output_resolution, num_inference_steps,
-    negative_prompt, guidance_scale, seed, turbo, lora, gpu_duration
+    negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo, gpu_duration
 ):
     return _run_pipeline(
         prompt, pil_references, width, height, output_resolution, num_inference_steps,
-        negative_prompt, guidance_scale, seed, turbo, lora
+        negative_prompt, guidance_scale, seed, turbo, lora, use_native_turbo
     )
+
 
 def b64_to_pil_list(b64_json_str):
     if not b64_json_str or b64_json_str.strip() in ("", "[]"):
@@ -416,10 +520,12 @@ def b64_to_pil_list(b64_json_str):
             print(f"Error decoding image: {e}")
     return pil_images
 
+
 def pil_to_b64_png(image: Image.Image) -> str:
     buf = BytesIO()
     image.save(buf, format="PNG")
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode()}"
+
 
 def make_thumb_b64(path, max_dim=220):
     if not os.path.exists(path):
@@ -433,6 +539,7 @@ def make_thumb_b64(path, max_dim=220):
     except Exception:
         return ""
 
+
 def encode_full_image(path):
     if not os.path.exists(path):
         return ""
@@ -440,20 +547,38 @@ def encode_full_image(path):
         with open(path, "rb") as f:
             data = f.read()
         ext = path.rsplit(".", 1)[-1].lower()
-        mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(ext, "image/jpeg")
+        mime = {
+            "jpg": "image/jpeg", "jpeg": "image/jpeg",
+            "png": "image/png", "webp": "image/webp",
+        }.get(ext, "image/jpeg")
         return f"data:{mime};base64,{base64.b64encode(data).decode()}"
     except Exception:
         return ""
 
+
 def generate(
     prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
-    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
+    guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo,
+    custom_lora_weight, custom_use_turbo, gpu_duration
 ):
     prompt = (prompt or "").strip()
     if not prompt:
         raise gr.Error("Enter a prompt.")
 
+    native_turbo = mode == TURBO_NATIVE_MODE
     turbo = mode == TURBO_MODE
+
+    # When using a custom LoRA the user can opt into the native turbo pipeline
+    # (8 steps) instead of the base pipeline (native steps). The default for
+    # that toggle (set in the UI) is the 8-step turbo pipeline.
+    if mode == CUSTOM_MODE and custom_use_turbo:
+        native_turbo = True
+
+    if native_turbo:
+        num_inference_steps = TURBO_NATIVE_STEPS
+        guidance_scale = 1.0
+        negative_prompt = ""
+
     if turbo:
         num_inference_steps = TURBO_STEPS
         guidance_scale = 1.0
@@ -498,7 +623,8 @@ def generate(
     runner = _generate_full_gpu if _needs_full_gpu(output_resolution, pil_refs) else _generate
     image = runner(
         prompt, pil_refs, width, height, output_resolution, int(num_inference_steps),
-        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config, int(gpu_duration)
+        (negative_prompt or "").strip(), float(guidance_scale), seed, turbo, lora_config,
+        native_turbo, int(gpu_duration)
     )
 
     run_mode = "edit" if pil_refs else "text-to-image"
@@ -506,23 +632,29 @@ def generate(
     gpu = "full GPU" if runner is _generate_full_gpu else "half GPU"
     has_alpha = "RGBA" if image.mode == "RGBA" else "RGB"
     lora_tag = lora_config["adapter_name"] if lora_config else "none"
+    if native_turbo:
+        pipe_tag = "turbo_native+custom_lora" if lora_config else "turbo_native"
+    else:
+        if turbo:
+            pipe_tag = "base+turbo_lora"
+        elif lora_config:
+            pipe_tag = "base+custom_lora"
+        else:
+            pipe_tag = "base"
     info = (
         f"{run_mode} | {size} | {int(num_inference_steps)} steps | seed {seed} | "
-        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | mode: {mode} | lora: {lora_tag} | "
-        f"gpu_duration: {gpu_duration}s\n{prompt}"
+        f"cfg {float(guidance_scale):.1f} | {gpu} | {has_alpha} | mode: {mode} | "
+        f"pipe: {pipe_tag} | lora: {lora_tag} | gpu_duration: {gpu_duration}s\n{prompt}"
     )
     return image, info, seed
 
+
 app = Server(title="Qwen-Image-2.1-LoRAs-PnP")
+
 
 @app.api(name="check_safety", queue=False)
 def check_safety(prompt: str) -> dict:
-    """Pure-CPU safety check. Runs BEFORE any @spaces.GPU resource is requested.
-
-    Returns:
-        {"status": "ok"}                       — prompt is safe, proceed
-        {"status": "blocked", "message": ...}  — NCII detected
-    """
+    """Pure-CPU safety check. Runs BEFORE any @spaces.GPU resource is requested."""
     if not prompt or not prompt.strip():
         return {"status": "ok"}
     is_unsafe, label, score = check_ncii_safety(prompt)
@@ -547,9 +679,15 @@ def infer(
     mode: str,
     custom_lora_repo: str,
     custom_lora_weight: str,
+    custom_use_turbo: bool,
     gpu_duration: int,
 ) -> dict:
-    """Generates an image using Qwen-Image-2.1 with PnP LoRAs."""
+    """Generates an image using Qwen-Image-2.1 or Qwen-Image-2.1-Turbo with PnP LoRAs.
+
+    When `mode` is the custom LoRA mode, `custom_use_turbo=True` runs the LoRA on
+    the native 8-step turbo pipeline; otherwise the base pipeline with the user's
+    step count is used.
+    """
     gc.collect()
     torch.cuda.empty_cache()
 
@@ -562,15 +700,17 @@ def infer(
 
     image, info, used_seed = generate(
         prompt, negative_prompt, images_b64_json, tier, aspect_ratio, num_inference_steps,
-        guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo, custom_lora_weight, gpu_duration
+        guidance_scale, transparent, seed, randomize_seed, mode, custom_lora_repo,
+        custom_lora_weight, custom_use_turbo, gpu_duration
     )
-    
+
     return {
         "image": pil_to_b64_png(image),
         "info": info,
         "seed": used_seed,
         "status": "success"
     }
+
 
 @app.api(name="load_example", queue=False)
 def load_example(idx: float) -> dict:
@@ -597,6 +737,7 @@ def load_example(idx: float) -> dict:
         "status": "ok"
     }
 
+
 @app.get("/api/config")
 def client_config():
     explorer_payload = []
@@ -609,13 +750,19 @@ def client_config():
             "repo": ex["repo"],
             "weights": ex["weights"]
         })
-    return {"app_name": "Qwen-Image-2.1-LoRAs-PnP", "explorer": explorer_payload}
+    return {
+        "app_name": "Qwen-Image-2.1-LoRAs-PnP",
+        "pipes": ["Qwen/Qwen-Image-2.1", "Qwen/Qwen-Image-2.1-Turbo"],
+        "explorer": explorer_payload,
+    }
+
 
 @app.get("/", response_class=HTMLResponse)
 async def homepage():
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
     with open(html_path, "r", encoding="utf-8") as f:
         return f.read()
+
 
 if __name__ == "__main__":
     app.launch(show_error=True, mcp_server=True)
